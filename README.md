@@ -3,13 +3,13 @@
 A library used for reading MPEG/Transport Stream files. Mainly created for KLV extraction using [klv-reader](https://github.com/GrimOutlook/klv-reader).
 
 ```rust
-...
+use ts_reader::TSReader;
 use std::fs::File;
 
 fn main() {
     let f = File::open("test_video.ts").unwrap();
     // Reader must be mutable due to internal state changing to keep track of what packet is to be read next.
-    let mut reader = ts_reader::new(f);
+    let mut reader = TSReader::new(f);
     // Get the first packet's payload data.
     let payload_data = reader.read_packet().unwrap().payload.unwrap();
     prinln!("Payload bytes: {:#?}", payload_data);
