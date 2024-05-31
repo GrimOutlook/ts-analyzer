@@ -12,3 +12,18 @@ mod errors {
     pub mod invalid_first_byte;
     pub mod no_sync_byte_found;
 }
+
+#[derive(Clone, Copy, Debug)]
+enum TransportScramblingControl {
+    NoScrambling = 0,
+    Reserved = 1,
+    EvenKey = 2,
+    OddKey = 3,
+}
+#[derive(Clone, Copy, Debug)]
+enum AdaptationFieldControl {
+    Reserved = 0,
+    Payload = 1,
+    AdaptationField = 2,
+    AdaptationAndPayload = 3,
+}
