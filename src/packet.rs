@@ -1,19 +1,21 @@
 //! Holds all the information regarding a given packet from the transport stream.
 use std::error::Error;
 use bitvec::macros::internal::funty::Fundamental;
-use log::trace;
 use bitvec::prelude::*;
-use crate::errors::InvalidFirstByteError;
+use crate::errors::invalid_first_byte::InvalidFirstByte;
+
+#[cfg(feature="log")]
+use log::trace;
 
 /// All transport stream packets start with a SYNC byte.
-const SYNC_BYTE: u8 = 0x47;
+pub const SYNC_BYTE: u8 = 0x47;
 
 /// All of this information is shamelessly stolen from wikipedia, my lord and savior.
 /// This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular. Please donate
 /// to wikipedia if you have the means.
 pub struct TSPacket {
     /// TEI: Transport error indicator is true when a packet is set when a demodulator cannot
-    /// correct errors and indicates that the packet is corrupt.
+    /// correct invalid_first_byte and indicates that the packet is corrupt.
     tei: bool,
     /// PUSI: Payload unit start indicator indicates if this packet contains the first byte of a
     /// payload since they can be spread across multiple packets.
@@ -54,10 +56,12 @@ impl TSPacket {
     pub fn from_bytes(buf: &mut [u8]) -> Result<TSPacket, Box<dyn Error>> {
         // Check if the first byte is SYNC byte.
         if buf[0] != SYNC_BYTE {
-            return Err(Box::new(InvalidFirstByteError { byte: buf[0] }));
+            return Err(Box::new(InvalidFirstByte { byte: buf[0] }));
         }
 
+        #[cfg(feature="log")]
         trace!("Parsing TSPacket from raw bytes: [{:#?}]", buf);
+
         Ok (TSPacket {
             tei: false,
             pusi: false,
