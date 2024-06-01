@@ -87,4 +87,8 @@ impl TSAdaptationField {
             transport_private_data,
         }
     }
+
+    pub fn has_adaptation_extension_field(&self) -> bool {
+        self.adaptation_field_extension_flag
+    }
 }

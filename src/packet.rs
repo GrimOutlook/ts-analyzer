@@ -2,6 +2,7 @@
 mod adaptation_extension;
 mod adaptation_field;
 mod header;
+mod payload;
 
 use crate::errors::invalid_first_byte::InvalidFirstByte;
 use crate::packet::adaptation_field::TSAdaptationField;
@@ -11,6 +12,7 @@ use bitvec::macros::internal::funty::Fundamental;
 use bitvec::prelude::*;
 use std::error::Error;
 
+use crate::packet::payload::TSPayload;
 #[cfg(feature = "log")]
 use log::trace;
 
@@ -37,7 +39,7 @@ pub struct TSPacket {
     adaptation_field: Option<TSAdaptationField>,
     /// Payload field data. This field will be `None` when the adaptation field control field has
     /// a `0` in the LSB place.
-    payload_data: Option<Box<[u8]>>,
+    payload: Option<TSPayload>,
 }
 
 impl TSPacket {
@@ -81,10 +83,28 @@ impl TSPacket {
             None
         };
 
+        // Handle the adaptation extension field.
+        if adaptation_field.is_some()
+            && adaptation_field.as_ref()
+            .expect("Expected adaptation field to not be None. I even checked!")
+            .has_adaptation_extension_field()
+        {
+            // We currently do nothing with the adaptation extension field.
+            // TODO: Add support for adaptation extension field.
+        };
+
+        let payload = if payload_exists {
+            let payload_bytes: Box<[u8]> = Box::from(BitVec::<u8, Msb0>::from_slice(&buf[read_idx..buf.len()]).as_raw_slice());
+            Some(TSPayload::from_bytes(header.pusi(), payload_bytes))
+        } else {
+            None
+        };
+
+        // Payload data should now start at the read_idx.
         let packet = TSPacket {
             header,
-            adaptation_field: None,
-            payload_data: None,
+            adaptation_field,
+            payload,
         };
 
         Ok(packet)
@@ -117,13 +137,18 @@ impl TSPacket {
     }
 
     /// Return the payload data
-    pub fn payload(&self) -> Option<Box<[u8]>> {
-        self.payload_data.clone()
+    pub fn payload(&self) -> Option<TSPayload> {
+        self.payload.clone()
     }
 
-    fn read_data_conditionally(flag: &bool, buf: &mut [u8], read_idx: &mut usize, read_size: usize) -> Option<BitVec<u8, Msb0>> {
-        if ! flag {
-            return None
+    fn read_data_conditionally(
+        flag: &bool,
+        buf: &mut [u8],
+        read_idx: &mut usize,
+        read_size: usize,
+    ) -> Option<BitVec<u8, Msb0>> {
+        if !flag {
+            return None;
         }
 
         Some(Self::read_data(buf, read_idx, read_size))
@@ -131,8 +156,7 @@ impl TSPacket {
 
     fn read_data(buf: &mut [u8], read_idx: &mut usize, read_size: usize) -> BitVec<u8, Msb0> {
         // Read the  data from the given buffer location
-        let bits: BitVec<u8, Msb0> =
-            BitVec::from_slice(&buf[*read_idx..*read_idx + read_size]);
+        let bits: BitVec<u8, Msb0> = BitVec::from_slice(&buf[*read_idx..*read_idx + read_size]);
 
         // Increment the read index since we just read a `PCR_SIZE` amount of bytes.
         *read_idx += read_size;
@@ -161,15 +185,13 @@ impl TSPacket {
     }
 
     fn parse_adaptation_field(buf: &mut [u8], read_idx: &mut usize) -> TSAdaptationField {
-
         // Get the length of the adaptation field.
         //
         // TODO: Determine if this takes into account the `Transport private data length` field
         // or not. If it doesn't then that field will need to be parsed as well. For the current
         // moment I'm assuming it takes it into account
-        let adaptation_field_len: u8 = BitVec::<u8, Msb0>::from_slice(
-            &buf[*read_idx..*read_idx + 1],
-        ).load();
+        let adaptation_field_len: u8 =
+            BitVec::<u8, Msb0>::from_slice(&buf[*read_idx..*read_idx + 1]).load();
 
         // Increment the read index since we just read a byte
         *read_idx += 1;
@@ -183,7 +205,7 @@ impl TSPacket {
         *read_idx += 1;
 
         // Create a little lambda function to reduce code duplication
-        let read_bool = |bits: &BitVec<u8, Msb0> , index: usize| { bits.get(index).unwrap().as_bool() };
+        let read_bool = |bits: &BitVec<u8, Msb0>, index: usize| bits.get(index).unwrap().as_bool();
 
         let discontinuity_indicator = read_bool(&adaptation_field_required, 0);
         let random_access_indicator = read_bool(&adaptation_field_required, 1);
@@ -194,11 +216,15 @@ impl TSPacket {
         let transport_private_data_flag = read_bool(&adaptation_field_required, 6);
         let adaptation_field_extension_flag = read_bool(&adaptation_field_required, 7);
 
-
         let pcr_data = Self::read_pcr_data(&pcr_flag, buf, read_idx);
         let opcr_data = Self::read_pcr_data(&opcr_flag, buf, read_idx);
 
-        let splice_countdown = match Self::read_data_conditionally(&splicing_point_flag, buf, read_idx, SPLICE_COUNTDOWN_SIZE as usize) {
+        let splice_countdown = match Self::read_data_conditionally(
+            &splicing_point_flag,
+            buf,
+            read_idx,
+            SPLICE_COUNTDOWN_SIZE as usize,
+        ) {
             Some(bits) => Some(bits.load()),
             None => None,
         };
@@ -207,19 +233,26 @@ impl TSPacket {
         // constructor below.
         let transport_private_data: Option<Box<[u8]>>;
 
-        let transport_private_data_length = match Self::read_data_conditionally(&transport_private_data_flag, buf, read_idx, TRANSPORT_PRIVATE_DATA_LENGTH_LENGTH as usize) {
+        let transport_private_data_length = match Self::read_data_conditionally(
+            &transport_private_data_flag,
+            buf,
+            read_idx,
+            TRANSPORT_PRIVATE_DATA_LENGTH_LENGTH as usize,
+        ) {
             Some(bits) => {
                 let length: u8 = bits.load();
 
-                transport_private_data = Some(Box::from(Self::read_data(buf, read_idx, length as usize).as_raw_slice()));
+                transport_private_data = Some(Box::from(
+                    Self::read_data(buf, read_idx, length as usize).as_raw_slice(),
+                ));
 
                 Some(length)
-            },
+            }
             None => {
                 transport_private_data = None;
 
                 None
-            },
+            }
         };
 
         TSAdaptationField::new(
@@ -239,5 +272,4 @@ impl TSPacket {
             transport_private_data,
         )
     }
-
 }
