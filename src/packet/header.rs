@@ -1,7 +1,8 @@
-use crate::{AdaptationFieldControl, TransportScramblingControl};
 use crate::AdaptationFieldControl::{AdaptationAndPayload, AdaptationField, Payload};
 use crate::TransportScramblingControl::{EvenKey, NoScrambling, OddKey};
-
+use crate::{AdaptationFieldControl, TransportScramblingControl};
+use log::trace;
+use std::fmt::{Display, Formatter};
 
 /// All of this information is shamelessly stolen from wikipedia, my lord and savior.
 /// This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular. Please donate
@@ -47,6 +48,13 @@ impl TSHeader {
         adaptation_field_control: u8,
         continuity_counter: u8,
     ) -> Self {
+        #[cfg(feature = "log")]
+        {
+            trace!("pid: [{}]", pid);
+            trace!("adaptation_field_control: [{}]", adaptation_field_control);
+            trace!("continuity_counter: [{}]", continuity_counter);
+        }
+
         TSHeader {
             tei,
             pusi,
@@ -57,16 +65,19 @@ impl TSHeader {
                 1 => TransportScramblingControl::Reserved,
                 2 => EvenKey,
                 3 => OddKey,
-                _ => panic!("Invalid TSC value [{}]", tsc)
+                _ => panic!("Invalid TSC value [{}]", tsc),
             },
             adaptation_field_control: match adaptation_field_control {
                 0 => AdaptationFieldControl::Reserved,
                 1 => Payload,
                 2 => AdaptationField,
                 3 => AdaptationAndPayload,
-                _ => panic!("Invalid adaptation field control value [{}]", adaptation_field_control)
+                _ => panic!(
+                    "Invalid adaptation field control value [{}]",
+                    adaptation_field_control
+                ),
             },
-            continuity_counter
+            continuity_counter,
         }
     }
 
@@ -103,5 +114,27 @@ impl TSHeader {
     /// Returns the continuity counter.
     pub fn continuity_counter(&self) -> u8 {
         self.continuity_counter
+    }
+}
+
+impl Display for TSHeader {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let msg = format!("\n\
+            TEI: {}\n\
+            PUSI: {}\n\
+            Transport Priority: {}\n\
+            PID: {}\n\
+            Transport Scrambling Control: {:?}\n\
+            Adaptation Field Control: {:?}\n\
+            Continuity Counter: {}",
+            self.tei,
+            self.pusi,
+            self.transport_priority,
+            self.pid,
+            self.tsc,
+            self.adaptation_field_control,
+            self.continuity_counter,
+        );
+        write!(f, "{}", msg)
     }
 }

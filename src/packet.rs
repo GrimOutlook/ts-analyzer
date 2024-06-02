@@ -11,6 +11,7 @@ use crate::AdaptationFieldControl::{AdaptationAndPayload, AdaptationField, Paylo
 use bitvec::macros::internal::funty::Fundamental;
 use bitvec::prelude::*;
 use std::error::Error;
+use std::io::Read;
 
 use crate::packet::payload::TSPayload;
 #[cfg(feature = "log")]
@@ -27,6 +28,9 @@ pub const SPLICE_COUNTDOWN_SIZE: u8 = 1;
 
 /// The length of the transport private data length field is 1 byte in size.
 pub const TRANSPORT_PRIVATE_DATA_LENGTH_LENGTH: u8 = 1;
+
+/// The length of a transport stream packet is 4 bytes in size.
+pub const HEADER_SIZE: u8 = 4;
 
 /// All of this information is shamelessly stolen from wikipedia, my lord and savior.
 /// This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular. Please donate
@@ -45,31 +49,45 @@ pub struct TSPacket {
 impl TSPacket {
     /// Create a TSPacket from a byte array.
     pub fn from_bytes(buf: &mut [u8]) -> Result<TSPacket, Box<dyn Error>> {
+        let header_bytes: BitVec<u8, Msb0> = BitVec::from_slice(&buf[0..HEADER_SIZE as usize]);
+
         // Check if the first byte is SYNC byte.
-        if buf[0] != SYNC_BYTE {
+        if header_bytes[0..8].load::<u8>() != SYNC_BYTE {
             return Err(Box::new(InvalidFirstByte { byte: buf[0] }));
         }
 
         #[cfg(feature = "log")]
-        trace!("Parsing TSPacket from raw bytes: [{:#?}]", buf);
+        trace!("Parsing TSPacket from raw bytes: {:02X?}", buf);
 
-        let header_bytes: BitVec<u8, Msb0> = BitVec::from_slice(&buf[1..=3]);
+        // Get the header information from the header bytes
+        let tei = header_bytes[9].as_bool();
+        let pusi = header_bytes[10].as_bool();
+        let transport_priority = header_bytes[11].as_bool();
+        let pid = header_bytes[12..24].load();
+        let transport_scrambling_control = header_bytes[24..26].to_bitvec().load();
+        let adaptation_field_control = header_bytes[26..28].to_bitvec().load();
+        let continuity_counter = header_bytes[28..32].load();
 
-        // Get some of the necessary information for further processing as some of this data is
-        // dynamic.
-        let adaptation_field_control = header_bytes[18..=19].to_bitvec();
-        let adaptation_field_exists = adaptation_field_control.get(0).unwrap().as_bool();
-        let payload_exists = adaptation_field_control.get(1).unwrap().as_bool();
+        let (adaptation_field_exists, payload_exists) = match adaptation_field_control {
+            1 => (false, true),
+            2 => (true, false),
+            3 => (true, true),
+            _ => {
+                panic!("Unknown adaptation field control byte: [{}]", adaptation_field_control)
+            }
+        };
 
         let header = TSHeader::new(
-            header_bytes.get(0).unwrap().as_bool(),
-            header_bytes.get(1).unwrap().as_bool(),
-            header_bytes.get(2).unwrap().as_bool(),
-            header_bytes[3..=15].load(),
-            header_bytes[16..=17].to_bitvec().load(),
-            header_bytes[18..=19].to_bitvec().load(),
-            header_bytes[20..=23].load(),
+            tei,
+            pusi,
+            transport_priority,
+            pid,
+            transport_scrambling_control,
+            adaptation_field_control,
+            continuity_counter,
         );
+        #[cfg(feature = "log")]
+        trace!("Header for TSPacket: {}", header);
 
         // This number comes from the fact that the TS header is always 4 bytes wide and the
         // adaptation field always comes directly after the header if it is present.
@@ -78,6 +96,8 @@ impl TSPacket {
         // If the adaptation field is present we need to determine it's size as we want to ignore
         // it entirely.
         let adaptation_field = if adaptation_field_exists {
+            #[cfg(feature = "log")]
+            trace!("Adaptation field exists for TSPacket");
             Some(Self::parse_adaptation_field(buf, &mut read_idx))
         } else {
             None
@@ -94,6 +114,9 @@ impl TSPacket {
         };
 
         let payload = if payload_exists {
+            #[cfg(feature = "log")]
+            trace!("Payload exists for TSPacket");
+
             let payload_bytes: Box<[u8]> = Box::from(BitVec::<u8, Msb0>::from_slice(&buf[read_idx..buf.len()]).as_raw_slice());
             Some(TSPayload::from_bytes(header.pusi(), payload_bytes))
         } else {

@@ -11,7 +11,7 @@ pub struct TSPayload {
 
 impl TSPayload {
     pub fn from_bytes(pusi: bool, payload_data: Box<[u8]>) -> TSPayload {
-        let (start_index, data) = if (pusi) {
+        let (start_index, data) = if pusi {
             (Some(payload_data[0]), Box::from(&payload_data[1..payload_data.len()]))
         } else {
             (None, payload_data)

@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::BufReader;
 
 fn main() {
+    env_logger::init();
     let filename = env::var("TEST_FILE").unwrap();
     println!("Reading data from {}", filename);
 
@@ -26,5 +27,5 @@ fn main() {
             break
         }
     }
-    println!("Payload bytes: {:#?}", packet.payload().expect("No payload in this packet").data());
+    println!("Payload bytes: {:02X?}", packet.payload().expect("No payload in this packet").data());
 }
