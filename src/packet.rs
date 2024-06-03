@@ -1,8 +1,7 @@
 //! Holds all the information regarding a given packet from the transport stream.
-mod adaptation_extension;
-mod adaptation_field;
-mod header;
-mod payload;
+pub mod payload;
+pub mod header;
+pub mod adaptation_field;
 
 use crate::errors::invalid_first_byte::InvalidFirstByte;
 use crate::packet::adaptation_field::TSAdaptationField;
@@ -117,8 +116,10 @@ impl TSPacket {
             #[cfg(feature = "log")]
             trace!("Payload exists for TSPacket");
 
-            let payload_bytes: Box<[u8]> = Box::from(BitVec::<u8, Msb0>::from_slice(&buf[read_idx..buf.len()]).as_raw_slice());
-            Some(TSPayload::from_bytes(header.pusi(), payload_bytes))
+            let payload_bytes: Box<[u8]> = Box::from(
+                BitVec::<u8, Msb0>::from_slice(&buf[read_idx..buf.len()]).as_raw_slice()
+            );
+            Some(TSPayload::from_bytes(header.pusi(), continuity_counter, payload_bytes))
         } else {
             None
         };

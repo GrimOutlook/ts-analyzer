@@ -1,3 +1,6 @@
+//! This module keep track of all of the information stored in the adaptation field
+//! of the transport stream packet header.
+
 /// All of this information is shamelessly stolen from wikipedia, my lord and savior.
 /// This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular. Please donate
 /// to wikipedia if you have the means.
@@ -51,6 +54,7 @@ pub struct TSAdaptationField {
 }
 
 impl TSAdaptationField {
+    /// Create a new adapation field.
     pub fn new(
         adaptation_field_length: u8,
         discontinuity_indicator: bool,
@@ -86,6 +90,8 @@ impl TSAdaptationField {
         }
     }
 
+    /// Return if the header indicates that this packet contains an adaptation
+    /// extension field.
     pub fn has_adaptation_extension_field(&self) -> bool {
         self.adaptation_field_extension_flag
     }

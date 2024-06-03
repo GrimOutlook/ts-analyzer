@@ -1,10 +1,11 @@
 //! A module for reading the transport stream.
-
 use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use crate::errors::no_sync_byte_found::NoSyncByteFound;
 use crate::packet::{SYNC_BYTE, TSPacket};
+use crate::packet::payload::TSPayload;
+use crate::helpers::tracked_payload::TrackedPayload;
 
 const PACKET_SIZE: usize = 188;
 
@@ -14,6 +15,13 @@ pub struct TSReader {
     buf_reader: BufReader<File>,
     /// Sync byte alignment. A Sync byte should be found every `PACKET_SIZE` away.
     sync_alignment: u64,
+    /// PIDs that should be tracked when querying for packets or payloads.
+    /// 
+    /// If empty, all PIDs are tracked. This will use more memory as there are more
+    /// incomplete payloads to keep track of.
+    tracked_pids: Vec<u16>,
+    /// Payloads that are currently being tracked by the reader.
+    tracked_payloads: Vec<TrackedPayload>,
 }
 
 impl TSReader {
@@ -78,6 +86,8 @@ impl TSReader {
         Ok(TSReader {
             buf_reader,
             sync_alignment,
+            tracked_pids: Vec::new(),
+            tracked_payloads: Vec::new(),
         })
     }
 
@@ -89,15 +99,15 @@ impl TSReader {
     /// `Some(TSPacket)` if the next transport stream packet could be parsed from the file.
     /// `None` if the next transport stream packet could not be parsed from the file for any
     /// reason. This includes if the entire file has been fully read.
-    pub fn read_next_packet_unchecked(&mut self) -> Option<TSPacket> {
-        self.read_next_packet().unwrap_or_else(|_| None)
+    pub fn next_packet_unchecked(&mut self) -> Option<TSPacket> {
+        self.next_packet().unwrap_or_else(|_| None)
     }
 
     /// Read the next packet from the transport stream file.
     /// # Returns
     /// `Ok(Some(TSPacket))` if the next transport stream packet could be parsed from the file.
     /// `Ok(None)` if there was no issue reading the file and no more TS packets can be read.
-    pub fn read_next_packet(&mut self) -> Result<Option<TSPacket>, Box<dyn Error>> {
+    pub fn next_packet(&mut self) -> Result<Option<TSPacket>, Box<dyn Error>> {
         let mut packet_buf = [0; PACKET_SIZE];
         let count = self.buf_reader.read(&mut packet_buf)?;
 
@@ -110,6 +120,28 @@ impl TSReader {
             Err(e) => Err(e),
         }
     }
+
+    /// Read the next payload from the transport stream file.
+    ///
+    /// This function returns `None` for any `Err` in order to prevent the need for `.unwrap()`
+    /// calls in more concise code.
+    /// # Returns
+    /// `Some(TSPayload)` if the next transport stream packet could be parsed from the file.
+    /// `None` if the next transport stream payload could not be parsed from the file for any
+    /// reason. This includes if the entire file has been fully read.
+    pub fn next_payload_unchecked(&mut self) -> Option<TSPayload> {
+        self.next_payload().unwrap_or_else(|_| None)
+    }
+
+    /// Get the next complete payload from this file.
+    pub fn next_payload(&mut self) -> Result<Option<TSPayload>, Box<dyn Error>> {
+        Ok(None)
+    }
+
+    /// Read the next full payload from the file.
+    /// 
+    /// This function parses through all transport stream packets, stores them in a buffer and
+    /// concatonates their payloads together once a payload has been complete.
 
     /// Return the alignment of the SYNC bytes in this reader.
     pub fn sync_byte_alignment(&self) -> u64 {

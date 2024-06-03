@@ -1,3 +1,6 @@
+//! This module keeps track of all of the information stored in the header of a
+//! transport stream packet.
+
 use crate::AdaptationFieldControl::{AdaptationAndPayload, AdaptationField, Payload};
 use crate::TransportScramblingControl::{EvenKey, NoScrambling, OddKey};
 use crate::{AdaptationFieldControl, TransportScramblingControl};
@@ -39,6 +42,7 @@ pub struct TSHeader {
 }
 
 impl TSHeader {
+    /// Create a new header
     pub fn new(
         tei: bool,
         pusi: bool,

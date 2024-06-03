@@ -1,6 +1,6 @@
 [package]
 name = "ts-analyzer"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Dominic Grimaldi <dominic.j.grimaldi@gmail.com>"]
 edition = "2021"
 description = "A simple library for analyzing packets in MPEG/Transport Stream files."
