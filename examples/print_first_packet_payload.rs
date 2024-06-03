@@ -1,7 +1,7 @@
-extern crate ts_reader;
+extern crate ts_analyzer;
 
 use std::env;
-use ts_reader::reader::TSReader;
+use ts_analyzer::reader::TSReader;
 use std::fs::File;
 use std::io::BufReader;
 
