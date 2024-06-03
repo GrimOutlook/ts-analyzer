@@ -44,7 +44,7 @@ impl TSReader {
             }
 
             // Note the location of this SYNC byte for later
-            let sync_pos = buf_reader.stream_position().unwrap();
+            let sync_pos = buf_reader.stream_position().expect("Couldn't get stream position from BufReader");
 
             // If we think this is the correct alignment because we have found a SYNC byte we need
             // to verify that this is correct by seeking 1 `PACKET_SIZE` away and verifying a SYNC

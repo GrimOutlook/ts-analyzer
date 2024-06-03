@@ -9,6 +9,10 @@
 
 A library used for analyzing MPEG/Transport Stream files. This library is not intended for encoding, decoding or multiplexing transport streams. It has mainly been created for KLV extraction using [klv-reader](https://github.com/GrimOutlook/klv-reader).
 
+## Examples
+
+### Reading the payload from the first packet with a payload.
+
 ```rust
 extern crate ts_analyzer;
 
@@ -18,23 +22,44 @@ use std::fs::File;
 use std::io::BufReader;
 
 fn main() {
-    let filename = env::var("TEST_FILE").unwrap();
+    env_logger::init();
+    let filename = env::var("TEST_FILE").expect("Environment variable not set");
     println!("Reading data from {}", filename);
 
-    let f = File::open(filename).unwrap();
+    let f = File::open(filename).expect("Couldn't open file");
     let buf_reader = BufReader::new(f);
     // Reader must be mutable due to internal state changing to keep track of what packet is to be
     // read next.
-    let mut reader = TSReader::new(buf_reader).unwrap();
-    // Get the first packet's payload data.
-    let payload_data = reader.read_next_packet() // Read the first TS packet from the file.
-                             .expect("Error reading file") // Assume there was no error reading the file.
-                             .expect("No valid TSPacket found") // Assume that a TSPacket was found in the file.
-                             .payload() // Get the payload of the TSPacket.
-                             .expect("No payload data in packet"); // Assume that there was payload data in the TSPacket.
-    println!("Payload bytes: {:#?}", payload_data);
+    let mut reader = TSReader::new(buf_reader).expect("Transport Stream file contains no SYNC bytes.");
+
+    let mut packet;
+    loop {
+        // Run through packets until we get to one with a payload.
+        packet = reader.read_next_packet_unchecked() // Read the first TS packet from the file.
+                        .expect("No valid TSPacket found"); // Assume that a TSPacket was found in the file.
+
+        if packet.has_payload()  { // Check if this packet has a payload.
+            break
+        }
+    }
+    assert!(packet.payload().is_some(), "No payload in packet");
 }
 ```
+
+### 
+
+---
+
+## Goals
+
+- [ ] Parse transport stream packets
+    - [x] Parse transport stream packet header
+    - [x] Parse transport straeam packet adaptation field
+    - [ ] Parse transport stream packet adaptation extension field
+    - [x] Be able to dump raw payload bytes from packet
+- [ ] Parse complete payloads from multiple packets
+    - [ ] Track packets based on PID
+    - [ ] Concatonate payloads of the same PID based on continuity counter
 
 ---
 
