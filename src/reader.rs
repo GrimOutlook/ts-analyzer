@@ -3,7 +3,8 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use crate::errors::no_sync_byte_found::NoSyncByteFound;
-use crate::packet::{SYNC_BYTE, TSPacket};
+use crate::packet::TSPacket;
+use crate::packet::header::SYNC_BYTE;
 use crate::packet::payload::TSPayload;
 use crate::helpers::tracked_payload::{self, TrackedPayload};
 
@@ -75,7 +76,7 @@ impl TSReader {
             // SYNC byte as we have nothing else to go off of.
             if count == 0 {
                 #[cfg(feature = "log")]
-                debug!("Could not find SYNC byte in file {}");
+                debug!("Could not find SYNC byte in file {}", filename);
                 return Err(Box::new(NoSyncByteFound));
             }
 
@@ -156,7 +157,7 @@ impl TSReader {
     /// `Some(TSPayload)` if the next transport stream packet could be parsed from the file.
     /// `None` if the next transport stream payload could not be parsed from the file for any
     /// reason. This includes if the entire file has been fully read.
-    pub fn next_payload_unchecked(&mut self) -> Option<TSPayload> {
+    pub fn next_payload_unchecked(&mut self) -> Option<Box<[u8]>> {
         self.next_payload().unwrap_or_else(|_| None)
     }
 
@@ -164,9 +165,16 @@ impl TSReader {
     ///
     /// This function parses through all transport stream packets, stores them in a buffer and
     /// concatenates their payloads together once a payload has been complete.
-    pub fn next_payload(&mut self) -> Result<Option<TSPayload>, Box<dyn Error>> {
+    pub fn next_payload(&mut self) -> Result<Option<Box<[u8]>>, Box<dyn Error>> {
         loop {
+            match self.next_packet() {
+                Ok(_) =>(),
+                Err(e) => return Err(e),
+            }
 
+            if let Some(Some(complete)) = self.tracked_payloads.iter_mut().map(|tp| tp.get_completed()).find(|c| c.is_some()) {
+                return Ok(Some(complete))
+            }
         }
     }
 

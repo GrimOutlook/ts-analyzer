@@ -15,9 +15,6 @@ use crate::packet::payload::TSPayload;
 #[cfg(feature = "log")]
 use log::trace;
 
-/// All transport stream packets start with a SYNC byte.
-pub const SYNC_BYTE: u8 = 0x47;
-
 /// The PCR field and OPCR field are 6 bytes in size.
 pub const PCR_SIZE: u8 = 6;
 
@@ -47,43 +44,16 @@ pub struct TSPacket {
 impl TSPacket {
     /// Create a TSPacket from a byte array.
     pub fn from_bytes(buf: &mut [u8]) -> Result<TSPacket, Box<dyn Error>> {
-        let header_bytes: BitVec<u8, Msb0> = BitVec::from_slice(&buf[0..HEADER_SIZE as usize]);
-
-        // Check if the first byte is SYNC byte.
-        if header_bytes[0..8].load::<u8>() != SYNC_BYTE {
-            return Err(Box::new(InvalidFirstByte { byte: buf[0] }));
-        }
+        let header_bytes = Box::from(buf[0..HEADER_SIZE as usize].to_vec());
 
         #[cfg(feature = "log")]
         trace!("Parsing TSPacket from raw bytes: {:02X?}", buf);
 
-        // Get the header information from the header bytes
-        let tei = header_bytes[9].as_bool();
-        let pusi = header_bytes[10].as_bool();
-        let transport_priority = header_bytes[11].as_bool();
-        let pid = header_bytes[12..24].load();
-        let transport_scrambling_control = header_bytes[24..26].to_bitvec().load();
-        let adaptation_field_control = header_bytes[26..28].to_bitvec().load();
-        let continuity_counter = header_bytes[28..32].load();
-
-        let (adaptation_field_exists, payload_exists) = match adaptation_field_control {
-            1 => (false, true),
-            2 => (true, false),
-            3 => (true, true),
-            _ => {
-                panic!("Unknown adaptation field control byte: [{}]", adaptation_field_control)
-            }
+        let header = match TSHeader::from_bytes(&header_bytes) {
+            Ok(header) => header,
+            Err(e) => return Err(e),
         };
 
-        let header = TSHeader::new(
-            tei,
-            pusi,
-            transport_priority,
-            pid,
-            transport_scrambling_control,
-            adaptation_field_control,
-            continuity_counter,
-        );
         #[cfg(feature = "log")]
         trace!("Header for TSPacket: {}", header);
 
@@ -93,7 +63,7 @@ impl TSPacket {
 
         // If the adaptation field is present we need to determine it's size as we want to ignore
         // it entirely.
-        let adaptation_field = if adaptation_field_exists {
+        let adaptation_field = if header.has_adaptation_field() {
             #[cfg(feature = "log")]
             trace!("Adaptation field exists for TSPacket");
             Some(Self::parse_adaptation_field(buf, &mut read_idx))
@@ -111,14 +81,14 @@ impl TSPacket {
             // TODO: Add support for adaptation extension field.
         };
 
-        let payload = if payload_exists {
+        let payload = if header.has_payload() {
             #[cfg(feature = "log")]
             trace!("Payload exists for TSPacket");
 
             let payload_bytes: Box<[u8]> = Box::from(
                 BitVec::<u8, Msb0>::from_slice(&buf[read_idx..buf.len()]).as_raw_slice()
             );
-            Some(TSPayload::from_bytes(header.pusi(), continuity_counter, payload_bytes))
+            Some(TSPayload::from_bytes(header.pusi(), header.continuity_counter(), payload_bytes))
         } else {
             None
         };
@@ -140,18 +110,12 @@ impl TSPacket {
 
     /// Returns if the packet has adaptation field data.
     pub fn has_adaptation_field(&self) -> bool {
-        match self.header().adaptation_field_control() {
-            AdaptationField | AdaptationAndPayload => true,
-            _ => false,
-        }
+        self.header.has_adaptation_field()
     }
 
     /// Returns if the packet has payload field data.
     pub fn has_payload(&self) -> bool {
-        match self.header().adaptation_field_control() {
-            Payload | AdaptationAndPayload => true,
-            _ => false,
-        }
+        self.header.has_payload()
     }
 
     /// Return the adaptation field data.

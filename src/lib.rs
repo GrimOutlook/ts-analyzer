@@ -23,14 +23,14 @@ mod helpers {
     pub mod tracked_payload;
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum TransportScramblingControl {
     NoScrambling = 0,
     Reserved = 1,
     EvenKey = 2,
     OddKey = 3,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum AdaptationFieldControl {
     Reserved = 0,
     Payload = 1,
