@@ -1,11 +1,12 @@
-//! This module keeps track of all of the information stored in the header of a
+//! This module keeps track of all the information stored in the header of a
 //! transport stream packet.
 
 use crate::AdaptationFieldControl::{AdaptationAndPayload, AdaptationField, Payload};
 use crate::TransportScramblingControl::{EvenKey, NoScrambling, OddKey};
 use crate::{AdaptationFieldControl, TransportScramblingControl};
-use log::trace;
 use std::fmt::{Display, Formatter};
+#[cfg(feature = "log")]
+use log::trace;
 
 /// All of this information is shamelessly stolen from wikipedia, my lord and savior.
 /// This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular. Please donate

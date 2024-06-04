@@ -7,10 +7,15 @@ use crate::packet::{SYNC_BYTE, TSPacket};
 use crate::packet::payload::TSPayload;
 use crate::helpers::tracked_payload::TrackedPayload;
 
+#[cfg(feature = "log")]
+use log::{info,debug,trace};
+
 const PACKET_SIZE: usize = 188;
 
 /// Struct used for holding information related to reading the transport stream.
 pub struct TSReader {
+    /// Filename for the file being read. Only really used for logging.
+    filename: String,
     /// Buffered reader for the transport stream file.
     buf_reader: BufReader<File>,
     /// Sync byte alignment. A Sync byte should be found every `PACKET_SIZE` away.
@@ -32,7 +37,7 @@ impl TSReader {
     /// transport packets.
     /// # Parameters
     /// - `buf_reader`: a buffered reader that contains transport stream data.
-    pub fn new(mut buf_reader: BufReader<File>) -> Result<Self, Box<dyn Error>> {
+    pub fn new(filename: &str, mut buf_reader: BufReader<File>) -> Result<Self, Box<dyn Error>> {
         // Find the first sync byte, so we can search easier by doing simple `PACKET_SIZE` buffer
         // reads.
         let mut read_buf = [0];
@@ -69,6 +74,7 @@ impl TSReader {
             // SYNC byte and isn't part of a payload then we'll simply assume that it really is a
             // SYNC byte as we have nothing else to go off of.
             if count == 0 {
+                debug!("Could not find SYNC byte in file {}");
                 return Err(Box::new(NoSyncByteFound));
             }
 
@@ -84,6 +90,7 @@ impl TSReader {
         }
 
         Ok(TSReader {
+            filename: filename.to_string(),
             buf_reader,
             sync_alignment,
             tracked_pids: Vec::new(),
@@ -109,15 +116,34 @@ impl TSReader {
     /// `Ok(None)` if there was no issue reading the file and no more TS packets can be read.
     pub fn next_packet(&mut self) -> Result<Option<TSPacket>, Box<dyn Error>> {
         let mut packet_buf = [0; PACKET_SIZE];
-        let count = self.buf_reader.read(&mut packet_buf)?;
+        loop {
+            let count = self.buf_reader.read(&mut packet_buf)?;
 
-        if count < PACKET_SIZE {
-            return Ok(None);
-        }
+            if count < PACKET_SIZE {
+                #[cfg(feature = "log")]
+                info!("Finished reading file {}", self.filename);
+                return Ok(None);
+            }
 
-        match TSPacket::from_bytes(&mut packet_buf) {
-            Ok(packet) => Ok(Some(packet)),
-            Err(e) => Err(e),
+            let packet = match TSPacket::from_bytes(&mut packet_buf) {
+                Ok(packet) => packet,
+                Err(e) => {
+                    #[cfg(feature = "log")]
+                    debug!("Got error when trying to read next packet from file {}", self.filename);
+                    return Err(e)
+                },
+            };
+
+            // Add this packet's payload to the tracked payloads, so we can grab it if we want.
+            self.add_tracked_payload(&packet);
+
+            // We should only return a packet if it is in the tracked PIDs (or there are no tracked
+            // PIDs)
+            if ! self.tracked_pids.is_empty() && ! self.tracked_pids.contains(&packet.header().pid()) {
+                continue
+            }
+
+            return Ok(Some(packet));
         }
     }
 
@@ -133,18 +159,63 @@ impl TSReader {
         self.next_payload().unwrap_or_else(|_| None)
     }
 
-    /// Get the next complete payload from this file.
-    pub fn next_payload(&mut self) -> Result<Option<TSPayload>, Box<dyn Error>> {
-        Ok(None)
-    }
-
     /// Read the next full payload from the file.
-    /// 
+    ///
     /// This function parses through all transport stream packets, stores them in a buffer and
-    /// concatonates their payloads together once a payload has been complete.
+    /// concatenates their payloads together once a payload has been complete.
+    pub fn next_payload(&mut self) -> Result<Option<TSPayload>, Box<dyn Error>> {
+        loop {
+
+        }
+    }
 
     /// Return the alignment of the SYNC bytes in this reader.
     pub fn sync_byte_alignment(&self) -> u64 {
         self.sync_alignment
+    }
+
+    /// Add a PID to the tracking list.
+    ///
+    /// Only tracked PIDs are returned when running methods that gather packets or payloads. If no
+    /// PID is specified then all PIDs are returned.
+    pub fn add_tracked_pid(&mut self, pid: u16) {
+        self.tracked_pids.push(pid);
+    }
+
+    /// Remove this PID from being tracked.
+    ///
+    /// Only tracked PIDs are returned when running methods that gather packets or payloads. If no
+    /// PID is specified then all PIDs are returned.
+    pub fn remove_tracked_pid(&mut self, pid: u16) {
+        self.tracked_pids.retain(|vec_pid| *vec_pid != pid);
+    }
+
+    /// Add payload data from a packet to the tracked payloads list.
+    fn add_tracked_payload(&mut self, packet: &TSPacket) -> Option<Box<u8>> {
+        let payload = match packet.payload() {
+            Some(payload) => payload,
+            None => return None
+        };
+
+        // Check to see if we already have an TrackedPayload object for this item PID
+        let pid = packet.header().pid();
+        match self.tracked_payloads.iter().position(|tp| tp.pid() == pid) {
+            Some(index) => {
+                return Self::append_data_to_tracked_payload(&self.tracked_payloads[index], &payload);
+            }
+            None => ()
+        }
+
+        let tp = match TrackedPayload::from_packet(packet) {
+            Ok(tp) => {
+                self.tracked_payloads.push(tp);
+            }
+            Err(_) => {}
+        };
+    }
+
+    /// Append the payload data to the known tracked payload
+    fn append_data_to_tracked_payload(tracked_payload: &mut TrackedPayload, payload: &TSPayload) {
+        tracked_payload.add_payload(payload)
     }
 }
