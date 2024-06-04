@@ -26,14 +26,15 @@ fn main() {
     let filename = env::var("TEST_FILE").expect("Environment variable not set");
     println!("Reading data from {}", filename);
 
-    let f = File::open(filename).expect("Couldn't open file");
+    let f = File::open(filename.clone()).expect("Couldn't open file");
     let buf_reader = BufReader::new(f);
     // Reader must be mutable due to internal state changing to keep track of what packet is to be
     // read next.
-    let mut reader = TSReader::new(buf_reader).expect("Transport Stream file contains no SYNC bytes.");
+    let mut reader = TSReader::new(&filename, buf_reader).expect("Transport Stream file contains no SYNC bytes.");
 
     let mut packet;
     loop {
+        println!("Reading packet");
         // Run through packets until we get to one with a payload.
         packet = reader.next_packet_unchecked() // Read the first TS packet from the file.
                        .expect("No valid TSPacket found"); // Assume that a TSPacket was found in the file.
@@ -67,11 +68,11 @@ fn main() {
     let filename = env::var("TEST_FILE").expect("Environment variable not set");
     println!("Reading data from {}", filename);
 
-    let f = File::open(filename).expect("Couldn't open file");
+    let f = File::open(filename.clone()).expect("Couldn't open file");
     let buf_reader = BufReader::new(f);
     // Reader must be mutable due to internal state changing to keep track of what packet is to be
     // read next and what payloads are being tracked.
-    let mut reader = TSReader::new(buf_reader).expect("Transport Stream file contains no SYNC bytes.");
+    let mut reader = TSReader::new(&filename, buf_reader).expect("Transport Stream file contains no SYNC bytes.");
     let search = TwoWaySearcher::new(KLV_HEADER);
 
     let mut payload;
