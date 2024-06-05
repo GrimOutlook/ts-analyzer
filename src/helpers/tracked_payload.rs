@@ -127,7 +127,33 @@ mod tests {
     }
 
     #[test]
-    fn get_completed () {
+    fn get_completed_2_packet () {
+        let mut tp = TrackedPayload::new(0);
+        
+        let raw_data = [2, 1, 2, 3, 4];
+        let expected_data: Box<[u8]> = Box::new([3, 4, 1, 2]);
+        let payload1 = TSPayload::from_bytes(true, 0, Box::new(raw_data));
+        let payload2 = TSPayload::from_bytes(true, 0, Box::new(raw_data));
+
+        tp.add(&payload1);
+
+        assert!(tp.get_completed().is_none(), "Payload is completed when it shouldn't be");
+
+        tp.add(&payload2);
+
+        let completed_payload = tp.get_completed();
+
+        assert!(completed_payload.is_some(), "Payload is not completed");
+
+        let data = completed_payload.unwrap();
+        assert!(data.iter().eq(expected_data.iter()), "Completed packet data is incorrect: {:?}", data);
+
+        // Verify that only the last packet's payload remains in the tracked payload vector.
+        assert_eq!(tp.payloads.len(), 1, "Returned payloads are still being tracked");
+    }
+
+    #[test]
+    fn get_completed_3_packet () {
         let mut tp = TrackedPayload::new(0);
         
         let raw_data = [2, 1, 2, 3, 4];
