@@ -3,15 +3,13 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use crate::errors::no_sync_byte_found::NoSyncByteFound;
-use crate::packet::TSPacket;
+use crate::packet::{TSPacket, PACKET_SIZE};
 use crate::packet::header::SYNC_BYTE;
 use crate::packet::payload::TSPayload;
 use crate::helpers::tracked_payload::{self, TrackedPayload};
 
 #[cfg(feature = "log")]
 use log::{info,debug,trace};
-
-const PACKET_SIZE: usize = 188;
 
 /// Struct used for holding information related to reading the transport stream.
 pub struct TSReader {
@@ -21,6 +19,8 @@ pub struct TSReader {
     buf_reader: BufReader<File>,
     /// Sync byte alignment. A Sync byte should be found every `PACKET_SIZE` away.
     sync_alignment: u64,
+    /// Counter of the number of packets read
+    packets_read: u64,
     /// PIDs that should be tracked when querying for packets or payloads.
     /// 
     /// If empty, all PIDs are tracked. This will use more memory as there are more
@@ -60,6 +60,9 @@ impl TSReader {
             // Note the location of this SYNC byte for later
             let sync_pos = buf_reader.stream_position().expect("Couldn't get stream position from BufReader");
 
+            #[cfg(feature = "log")]
+            trace!("SYNC found at position {} for file {}", sync_pos, filename);
+
             // If we think this is the correct alignment because we have found a SYNC byte we need
             // to verify that this is correct by seeking 1 `PACKET_SIZE` away and verifying a SYNC
             // byte is there. If there isn't one there then this is simply the same data as a SYNC
@@ -68,7 +71,7 @@ impl TSReader {
             // There is always the possibility that we hit a `0x47` in the payload, seek 1
             // `PACKET_SIZE` further, and find another `0x47` but I don't have a way of accounting
             // for that, so we're going with blind hope that this case doesn't get seen.
-            buf_reader.seek_relative(PACKET_SIZE as i64)?;
+            buf_reader.seek_relative(PACKET_SIZE as i64 - 1)?;
             let count = buf_reader.read(&mut read_buf)?;
 
             // If we run out of data to read while trying to verify that the SYNC byte is actually a
@@ -81,7 +84,7 @@ impl TSReader {
             }
 
             // Seek back to the original location for later reading.
-            buf_reader.seek(SeekFrom::Start(sync_pos))?;
+            buf_reader.seek(SeekFrom::Start(sync_pos - 1))?;
 
             // If the byte 1 `PACKET_SIZE` away is also a SYNC byte we can be relatively sure that
             // this alignment is correct.
@@ -95,6 +98,7 @@ impl TSReader {
             filename: filename.to_string(),
             buf_reader,
             sync_alignment,
+            packets_read: 0,
             tracked_pids: Vec::new(),
             tracked_payloads: Vec::new(),
         })
@@ -121,17 +125,30 @@ impl TSReader {
         loop {
             let count = self.buf_reader.read(&mut packet_buf)?;
 
+            #[cfg(feature = "log")]
+            {
+                if let Ok(position) = self.buf_reader.stream_position() {
+                    trace!("Seek position in file {}: {}", self.filename, position)
+                }
+            }
+
+
             if count < PACKET_SIZE {
                 #[cfg(feature = "log")]
                 info!("Finished reading file {}", self.filename);
                 return Ok(None);
             }
 
+            self.packets_read += 1;
+            #[cfg(feature = "log")]
+            trace!("Packets read in file {}: {}", self.filename, self.packets_read);
+
             let packet = match TSPacket::from_bytes(&mut packet_buf) {
                 Ok(packet) => packet,
                 Err(e) => {
                     #[cfg(feature = "log")]
-                    debug!("Got error when trying to read next packet from file {}", self.filename);
+                    debug!("Got error from {} when trying to parse next packet from bytes {:2X?}",
+                        self.filename, packet_buf);
                     return Err(e)
                 },
             };
@@ -173,6 +190,8 @@ impl TSReader {
             }
 
             if let Some(Some(complete)) = self.tracked_payloads.iter_mut().map(|tp| tp.get_completed()).find(|c| c.is_some()) {
+                #[cfg(feature = "log")]
+                debug!("Full payload: {:02?}", complete);
                 return Ok(Some(complete))
             }
         }

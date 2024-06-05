@@ -109,10 +109,10 @@ impl TSHeader {
 
         // Get the header information from the header bytes
         let header = TSHeader {
-            tei: bytes[9],
-            pusi: bytes[10],
-            transport_priority: bytes[11],
-            pid: bytes[12..24].to_bitvec().load_be(),
+            tei: bytes[8],
+            pusi: bytes[9],
+            transport_priority: bytes[10],
+            pid: bytes[11..24].to_bitvec().load_be(),
             tsc: match bytes[24..26].to_bitvec().load_be() {
                 0 => NoScrambling,
                 1 => TransportScramblingControl::Reserved,
@@ -120,7 +120,7 @@ impl TSHeader {
                 3 => OddKey,
                 default => panic!("Invalid TSC value [{}]", default),
             },
-            adaptation_field_control: match bytes[26..28].to_bitvec().load_be() {
+            adaptation_field_control: match bytes[26..28].to_bitvec().load_be::<u8>() {
                 0 => AdaptationFieldControl::Reserved,
                 1 => Payload,
                 2 => AdaptationField,
@@ -226,5 +226,18 @@ mod tests {
         assert_eq!(header.transport_priority(), false, "Transport Priority is incorrect");
         assert_eq!(header.pid(), 256, "Transport Priority is incorrect");
         assert_eq!(header.adaptation_field_control(), Payload, "Transport Priority is incorrect");
+        assert_eq!(header.continuity_counter(), 10, "Transport Priority is incorrect");
+    }
+
+    #[test]
+    fn from_bytes2() {
+        let buf: Box<[u8]> = Box::new([0x47, 0xE1, 0x00, 0x3B]);
+        let header = TSHeader::from_bytes(&buf).unwrap();
+        assert_eq!(header.tei(), true, "Transport Error Indicator is incorrect");
+        assert_eq!(header.pusi(), true, "Payload Unit Start Indicator is incorrect");
+        assert_eq!(header.transport_priority(), true, "Transport Priority is incorrect");
+        assert_eq!(header.pid(), 256, "Transport Priority is incorrect");
+        assert_eq!(header.adaptation_field_control(), AdaptationAndPayload, "Transport Priority is incorrect");
+        assert_eq!(header.continuity_counter(), 11, "Transport Priority is incorrect");
     }
 }

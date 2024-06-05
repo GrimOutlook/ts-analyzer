@@ -79,8 +79,12 @@ fn main() {
     loop {
         println!("Reading packet");
         // Run through packets until we get to one with a payload.
-        payload = reader.next_payload_unchecked() // Read the first TSPayload from the file.
-                        .expect("No valid TSPayload found"); // Assume that a TSPayload was found in the file.
+        payload = match reader.next_payload() {
+            Ok(payload) => payload.expect("No valid complete TS payload found"),
+            Err(e) => {
+                panic!("An error was hit!: {}", e);
+            }
+        };
 
         
         println!("Payload bytes: {:02X?}", payload);
