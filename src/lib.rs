@@ -5,6 +5,8 @@
 
 //! This crate is used to read the payload data from a given transport stream.
 
+use std::{error::Error, fmt::Display};
+
 // Include the README in the doc-tests.
 #[doc = include_str!("../README.md")]
 
@@ -37,4 +39,21 @@ enum AdaptationFieldControl {
     Payload = 1,
     AdaptationField = 2,
     AdaptationAndPayload = 3,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Errors {
+    InvalidFirstByte(u8),
+
+}
+
+impl Error for Errors {}
+
+impl Display for Errors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Errors::InvalidFirstByte(invalid_byte) => 
+                write!(f, "invalid first byte for packet: [{}]", invalid_byte),
+        }
+    }
 }
