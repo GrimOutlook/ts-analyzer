@@ -104,42 +104,33 @@ impl TSHeader {
             return Err(Box::new(InvalidFirstByte { byte: buf[0] }));
         }
 
-        println!("header bytes: {:b}", bytes);
-        println!("tei: {:b}", bytes[9] as u8);
-        
-        
-        // Get the header information from the header bytes
-        let tei = bytes[9];
-        let pusi = bytes[10];
-        let transport_priority = bytes[11];
-        let pid = bytes[12..24].to_bitvec().load();
-        let transport_scrambling_control = bytes[24..26].to_bitvec().load();
-        let adaptation_field_control = bytes[26..28].to_bitvec().load();
-        let continuity_counter = bytes[28..32].load();
+        #[cfg(feature = "log")]
+        trace!("header bytes: {:b}", bytes);
 
+        // Get the header information from the header bytes
         let header = TSHeader {
-            tei,
-            pusi,
-            transport_priority,
-            pid,
-            tsc: match transport_scrambling_control {
+            tei: bytes[9],
+            pusi: bytes[10],
+            transport_priority: bytes[11],
+            pid: bytes[12..24].to_bitvec().load_be(),
+            tsc: match bytes[24..26].to_bitvec().load_be() {
                 0 => NoScrambling,
                 1 => TransportScramblingControl::Reserved,
                 2 => EvenKey,
                 3 => OddKey,
-                _ => panic!("Invalid TSC value [{}]", transport_scrambling_control),
+                default => panic!("Invalid TSC value [{}]", default),
             },
-            adaptation_field_control: match adaptation_field_control {
+            adaptation_field_control: match bytes[26..28].to_bitvec().load_be() {
                 0 => AdaptationFieldControl::Reserved,
                 1 => Payload,
                 2 => AdaptationField,
                 3 => AdaptationAndPayload,
-                _ => panic!(
+                default => panic!(
                     "Invalid adaptation field control value [{}]",
-                    adaptation_field_control
+                    default
                 ),
             },
-            continuity_counter,
+            continuity_counter: bytes[28..32].load_be(),
         };
         
         Ok(header)
