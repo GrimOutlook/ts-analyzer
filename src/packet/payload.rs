@@ -2,7 +2,7 @@
 
 use std::error::Error;
 
-use crate::errors::payload_is_not_start::PayloadIsNotStart;
+use crate::TSError::{self,PUSIsNotSet};
 
 #[derive(Clone, Debug)]
 /// Payload of a transport stream object.
@@ -75,9 +75,9 @@ impl TSPayload {
     }
 
     /// Returns the new payload data. This is the data after the start index, if one exists.
-    pub fn get_start_data(&self) -> Result<Box<[u8]>, Box<dyn Error>> {
+    pub fn get_start_data(&self) -> Result<Box<[u8]>, TSError> {
         let Some(index) = self.start_index else {
-            return Err(Box::new(PayloadIsNotStart))
+            return Err(PUSIsNotSet)
         };
 
         Ok(Box::from(self.data[index as usize..self.data.len()].to_vec()))
@@ -135,20 +135,27 @@ mod tests {
     #[test_case(false; "Payload does not contain start")]
     fn get_start_data(pusi: bool) {
         let raw_data = [2, 1, 2, 3, 4];
-        let expected_data: Result<Box<[u8]>, Box<dyn Error>> = match pusi {
+        let expected_data: Result<Box<[u8]>, TSError> = match pusi {
             true => {
                 // We add 1 because in the actual function we remove the first item when the PUSI is
                 // true
                 let idx = raw_data[0] + 1;
                 Ok(Box::from(raw_data[idx as usize..raw_data.len()].to_vec()))
             },
-            false => Err(Box::new(PayloadIsNotStart)),
+            false => Err(PUSIsNotSet),
         };
         let payload = TSPayload::from_bytes(pusi, 0, Box::new(raw_data));
 
         match payload.get_start_data() {
             Ok(data) => assert!(data.iter().eq(expected_data.unwrap().iter()), "Start data is incorrect"),
-            Err(data) => assert_eq!(data.type_id(), expected_data.unwrap_err().type_id(), "Incorrect error type"),
+            Err(data) => {
+
+                match expected_data {
+                    Ok(_) => assert!(false, "Error not thrown when expected"),
+                    Err(e) => assert_eq!(e, data, "Incorrect error type"),
+                };
+                
+            },
         };
     }
 }

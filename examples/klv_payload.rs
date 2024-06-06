@@ -1,7 +1,7 @@
 extern crate ts_analyzer;
 
-use std::{env, error::Error};
-use ts_analyzer::reader::TSReader;
+use std::{env, io::ErrorKind};
+use ts_analyzer::{reader::TSReader, TSError};
 use std::fs::File;
 use std::io::BufReader;
 use memmem::{Searcher, TwoWaySearcher};
@@ -17,7 +17,7 @@ fn main() {
     let buf_reader = BufReader::new(f);
     // Reader must be mutable due to internal state changing to keep track of what packet is to be
     // read next and what payloads are being tracked.
-    let mut reader = TSReader::new(&filename, buf_reader).expect("Transport Stream file contains no SYNC bytes.");
+    let mut reader = TSReader::new( buf_reader).expect("Transport Stream file contains no SYNC bytes.");
     let search = TwoWaySearcher::new(KLV_HEADER);
 
     let mut payload;
@@ -27,10 +27,18 @@ fn main() {
         payload = match reader.next_payload() {
             Ok(payload) => payload.expect("No valid complete TS payload found"),
             Err(e) => {
-                if e.is::<std::io::Error>() {
-                    
+                match e {
+                    TSError::ReaderError(e) => {
+                        if e.kind() == ErrorKind::UnexpectedEof {
+                            println!("Finished reading file {}", filename);
+                            return
+                        } else {
+                            panic!("Error when reading from reader: {}", e)
+                        }
+                    },
+                    e => panic!("An error was hit!: {}", e),
                 }
-                panic!("An error was hit!: {}", e);
+                
             }
         };
 

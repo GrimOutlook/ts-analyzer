@@ -28,7 +28,7 @@ fn main() {
     let buf_reader = BufReader::new(f);
     // Reader must be mutable due to internal state changing to keep track of what packet is to be
     // read next.
-    let mut reader = TSReader::new(&filename, buf_reader).expect("Transport Stream file contains no SYNC bytes.");
+    let mut reader = TSReader::new(buf_reader).expect("Transport Stream file contains no SYNC bytes.");
 
     let mut packet;
     loop {
@@ -57,9 +57,9 @@ fn main() {
     - [x] Parse transport stream packet adaptation field
     - [ ] Parse transport stream packet adaptation extension field
     - [x] Be able to dump raw payload bytes from packet
-- [ ] Parse complete payloads from multiple packets
-    - [ ] Track packets based on PID
-    - [ ] Concatenate payloads of the same PID based on continuity counter
+- [x] Parse complete payloads from multiple packets
+    - [x] Track packets based on PID
+    - [x] Concatenate payloads of the same PID based on continuity counter
 
 ---
 

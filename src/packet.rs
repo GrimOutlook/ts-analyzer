@@ -3,8 +3,7 @@ pub mod payload;
 pub mod header;
 pub mod adaptation_field;
 
-use crate::errors::invalid_payload_pointer::InvalidPayloadPointer;
-use crate::packet::adaptation_field::DataAdaptationField;
+use crate::{packet::adaptation_field::DataAdaptationField, TSError};
 use crate::packet::header::TSHeader;
 use adaptation_field::{AdaptationField, StuffingAdaptationField};
 use bitvec::prelude::*;
@@ -35,7 +34,7 @@ pub struct TSPacket {
 
 impl TSPacket {
     /// Create a TSPacket from a byte array.
-    pub fn from_bytes(buf: &mut [u8]) -> Result<TSPacket, Box<dyn Error>> {
+    pub fn from_bytes(buf: &mut [u8]) -> Result<TSPacket, TSError> {
         let buffer_length = buf.len();
         let header_bytes = Box::from(buf[0..HEADER_SIZE as usize].to_vec());
 
@@ -96,7 +95,7 @@ impl TSPacket {
 
             let remainder = (PACKET_SIZE - read_idx) as u8;
             if header.pusi() && payload_bytes[0] > remainder {
-                return Err(Box::new(InvalidPayloadPointer { pointer: payload_bytes[0], remainder }))
+                return Err(TSError::InvalidPayloadPointer(payload_bytes[0], remainder))
             }
 
             Some(TSPayload::from_bytes(header.pusi(), header.continuity_counter(), payload_bytes))

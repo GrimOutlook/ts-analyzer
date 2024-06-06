@@ -1,5 +1,5 @@
 use std::error::Error;
-use crate::errors::no_payload::NoPayload;
+use crate::TSError::{self, NoPayload};
 use crate::packet::payload::{self, TSPayload};
 use crate::packet::TSPacket;
 
@@ -28,10 +28,10 @@ impl TrackedPayload {
     /// Create a tracked payload object from a packet.
     ///
     /// This initializes the object with only the payload data of the packet that was passed in.
-    pub fn from_packet(packet: &TSPacket) -> Result<Self, Box<dyn Error>> {
+    pub fn from_packet(packet: &TSPacket) -> Result<Self, TSError> {
         let payload = match packet.payload() {
             Some(payload) => payload,
-            None => return Err(Box::new(NoPayload))
+            None => return Err(NoPayload)
         };
 
         Ok(TrackedPayload {
@@ -98,7 +98,7 @@ impl TrackedPayload {
         let payload_data: Box<[u8]> = data_vec.iter().flat_map(|s| s.clone().into_vec()).collect();
 
         #[cfg(feature = "log")]
-        trace!("Completed payload data: {:2X?}", payload_data);
+        trace!("Completed payload data: {:02X?}", payload_data);
 
         return Some(payload_data)
     }

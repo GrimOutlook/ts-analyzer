@@ -1,13 +1,12 @@
 //! This module keeps track of all the information stored in the header of a
 //! transport stream packet.
 
-use crate::errors::invalid_first_byte::InvalidFirstByte;
 use crate::AdaptationFieldControl::{AdaptationAndPayload, AdaptationField, Payload};
 use crate::TransportScramblingControl::{EvenKey, NoScrambling, OddKey};
+use crate::TSError::{self, InvalidFirstByte};
 use crate::{AdaptationFieldControl, TransportScramblingControl};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use bitvec::macros::internal::funty::Fundamental;
 use bitvec::field::BitField;
 use bitvec::order::Msb0;
 use bitvec::vec::BitVec;
@@ -96,12 +95,12 @@ impl TSHeader {
     }
 
     /// Get the packet header from raw bytes.
-    pub fn from_bytes(buf: &Box<[u8]>) -> Result<TSHeader, Box<dyn Error>> {
+    pub fn from_bytes(buf: &Box<[u8]>) -> Result<TSHeader, TSError> {
         let bytes: BitVec<u8, Msb0> = BitVec::from_slice(buf).to_bitvec();
 
         // Check if the first byte is SYNC byte.
         if bytes[0..8].load::<u8>() != SYNC_BYTE {
-            return Err(Box::new(InvalidFirstByte { byte: buf[0] }));
+            return Err(InvalidFirstByte(buf[0]));
         }
 
         #[cfg(feature = "log")]
