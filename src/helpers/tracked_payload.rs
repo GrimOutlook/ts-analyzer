@@ -1,11 +1,9 @@
-use std::error::Error;
 use crate::TSError::{self, NoPayload};
-use crate::packet::payload::{self, TSPayload};
+use crate::packet::payload::TSPayload;
 use crate::packet::TSPacket;
 
 #[cfg(feature = "log")]
 use log::trace;
-use memmem::{Searcher, TwoWaySearcher};
 
 pub(crate) struct TrackedPayload {
     /// PID of the packet that these payloads belong to.
@@ -17,13 +15,6 @@ pub(crate) struct TrackedPayload {
 }
 
 impl TrackedPayload {
-    /// Create a new tracked payload
-    pub fn new(pid: u16) -> Self {
-        TrackedPayload {
-            pid,
-            payloads: Vec::new(),
-        }
-    }
 
     /// Create a tracked payload object from a packet.
     ///
@@ -115,13 +106,21 @@ mod tests {
     use super::*;
     use test_case::test_case;
 
+    /// Create a new tracked payload
+    pub fn new(pid: u16) -> TrackedPayload {
+        TrackedPayload {
+            pid,
+            payloads: Vec::new(),
+        }
+    }
+
     #[test_case(true, 1; "Payload contains start")]
     #[test_case(false, 0; "Payload does not contain start")]
     fn add_one (pusi: bool, expected_len: usize) {
         let raw_data = [2, 1, 2, 3, 4];
         
         let payload = TSPayload::from_bytes(pusi, 0, Box::new(raw_data));
-        let mut tp = TrackedPayload::new(0);
+        let mut tp = new(0);
         tp.add(&payload);
 
         assert_eq!(tp.payloads.len(), expected_len, "Tracked payloads is not the expected length");
@@ -129,7 +128,7 @@ mod tests {
 
     #[test]
     fn get_completed_2_packet () {
-        let mut tp = TrackedPayload::new(0);
+        let mut tp = new(0);
         
         let raw_data = [2, 1, 2, 3, 4];
         let expected_data: Box<[u8]> = Box::new([3, 4, 1, 2]);
@@ -155,7 +154,7 @@ mod tests {
 
     #[test]
     fn get_completed_3_packet () {
-        let mut tp = TrackedPayload::new(0);
+        let mut tp = new(0);
         
         let raw_data = [2, 1, 2, 3, 4];
         let expected_data: Box<[u8]> = Box::new([3, 4, 2, 1, 2, 3, 4, 1, 2]);

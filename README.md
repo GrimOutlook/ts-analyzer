@@ -42,8 +42,10 @@ fn main() {
         }
     }
 
+    // This is only the payload data from this packet. This is not all of the data from a full
+    // payload which can be split among many packets. If that is what is desired look into using
+    // the `.next_payload()` and `.next_payload_unchecked()` methods instead.
     let payload = packet.payload();
-    assert!(payload.is_some(), "No payload in packet");
     println!("Payload bytes: {:02X?}", payload.unwrap().data());
 }
 ```
@@ -60,6 +62,9 @@ fn main() {
 - [x] Parse complete payloads from multiple packets
     - [x] Track packets based on PID
     - [x] Concatenate payloads of the same PID based on continuity counter
+- [ ] Improve throughput of packet and payload reading.
+    - Current speeds are around 15MB/s for payload reading and 22MB/s for packet reading 
+    even with data directly in memory.
 
 ---
 

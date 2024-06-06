@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 // Use these checks when closer to complete. They're a bit too strict for early development.
-// #![deny(future_incompatible, missing_docs, rust_2018_idioms, unused, warnings)]
-#![deny(future_incompatible, missing_docs, rust_2018_idioms)]
+#![deny(future_incompatible, missing_docs, rust_2018_idioms, unused, warnings)]
 
 //! This crate is used to read the payload data from a given transport stream.
 
@@ -15,18 +14,29 @@ mod helpers {
     pub mod tracked_payload;
 }
 
+/// Flag that is set when transmitting encrypted video
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum TransportScramblingControl {
+pub enum TransportScramblingControl {
+    /// `0` indicates that the data is not scrambled
     NoScrambling = 0,
+    /// `1` is reserved per the standard
     Reserved = 1,
+    /// `2` indicates that the data is scrambled with the/an "even" key.
     EvenKey = 2,
+    /// `3` indicates that the data is scrambled with the/an "odd" key.
     OddKey = 3,
 }
+
+/// Whether the packet has a Payload, an Adaptation Field, both, or neither.
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum AdaptationFieldControl {
+pub enum AdaptationFieldControl {
+    /// `0` is reserved per the standard
     Reserved = 0,
+    /// `1` indicates that only the payload field exists
     Payload = 1,
+    /// `2` indicates that only the adaptation field exists
     AdaptationField = 2,
+    /// `3` indicates that both the adaptation field and payload field exist.
     AdaptationAndPayload = 3,
 }
 

@@ -1,7 +1,5 @@
 //! TSPayload keeps track of the payload data.
 
-use std::error::Error;
-
 use crate::TSError::{self,PUSIsNotSet};
 
 #[derive(Clone, Debug)]
@@ -86,8 +84,6 @@ impl TSPayload {
 
 #[cfg(test)]
 mod tests {
-    use std::any::Any;
-
     use super::*;
     use test_case::test_case;
 

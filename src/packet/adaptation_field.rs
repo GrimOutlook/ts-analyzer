@@ -250,10 +250,69 @@ impl DataAdaptationField {
         self.adaptation_field_length
     }
 
-    /// Return if the header indicates that this packet contains an adaptation
-    /// extension field.
-    pub fn has_adaptation_extension_field(&self) -> bool {
+    /// Returns if the discontinuity indicator is set or not
+    pub fn discontinuity_indicator(&self) -> bool {
+        self.discontinuity_indicator
+    }
+
+    /// Returns if the random access indicator is set or not
+    pub fn random_access_indicator(&self) -> bool {
+        self.random_access_indicator
+    }
+
+    /// Returns if the elementary stream priority indicator is set or not
+    pub fn elementary_stream_priority_indicator(&self) -> bool {
+        self.elementary_stream_priority_indicator
+    }
+
+    /// Returns if the PCR flag is set or not
+    pub fn pcr_flag(&self) -> bool {
+        self.pcr_flag
+    }
+
+    /// Returns if the OPCR flag is set or not
+    pub fn opcr_flag(&self) -> bool {
+        self.opcr_flag
+    }
+
+    /// Returns if the splicing point flag is set or not
+    pub fn splicing_point_flag(&self) -> bool {
+        self.splicing_point_flag
+    }
+
+    /// Returns if the transport private data flag is set or not
+    pub fn transport_private_data_flag(&self) -> bool {
+        self.transport_private_data_flag
+    }
+
+    /// Returns if the adaptation extension field flag is set or not
+    pub fn adaptation_extension_field_flag(&self) -> bool {
         self.adaptation_field_extension_flag
+    }
+
+    /// Returns the PCR in the packet if one exists
+    pub fn pcr(&self) -> Option<u64> {
+        self.pcr
+    }
+
+    /// Returns the OPCR in the packet if one exists
+    pub fn opcr(&self) -> Option<u64> {
+        self.opcr
+    }
+
+    /// Returns the splice countdown in the packet if one exists
+    pub fn splice_countdown(&self) -> Option<i8> {
+        self.splice_countdown
+    }
+
+    /// Returns the transport private data length in the packet if one exists
+    pub fn transport_private_data_length(&self) -> Option<u8> {
+        self.transport_private_data_length
+    }
+
+    /// Returns the splice countdown in the packet if one exists
+    pub fn transport_private_data(&self) -> &Option<Box<[u8]>> {
+        &self.transport_private_data
     }
 }
 

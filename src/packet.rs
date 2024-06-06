@@ -7,7 +7,6 @@ use crate::{packet::adaptation_field::DataAdaptationField, TSError};
 use crate::packet::header::TSHeader;
 use adaptation_field::{AdaptationField, StuffingAdaptationField};
 use bitvec::prelude::*;
-use std::error::Error;
 
 use crate::packet::payload::TSPayload;
 #[cfg(feature = "log")]

@@ -1,5 +1,5 @@
 //! A module for reading the transport stream.
-use std::io::{BufReader, ErrorKind, Read, Seek, SeekFrom};
+use std::io::{ErrorKind, Read, Seek, SeekFrom};
 use crate::packet::{TSPacket, PACKET_SIZE};
 use crate::packet::header::SYNC_BYTE;
 use crate::helpers::tracked_payload::TrackedPayload;
@@ -11,7 +11,7 @@ use log::{info,debug,trace};
 /// Struct used for holding information related to reading the transport stream.
 pub struct TSReader<R: Read + Seek> {
     /// Buffered reader for the transport stream file.
-    buf_reader: BufReader<R>,
+    buf_reader: R,
     /// Sync byte alignment. A Sync byte should be found every `PACKET_SIZE` away.
     sync_alignment: u64,
     /// Counter of the number of packets read
@@ -33,14 +33,14 @@ impl<R> TSReader<R> where R: Read + Seek{
     /// transport packets.
     /// # Parameters
     /// - `buf_reader`: a buffered reader that contains transport stream data.
-    pub fn new(mut buf_reader: BufReader<R>) -> Result<Self, TSError> {
+    pub fn new(mut reader: R) -> Result<Self, TSError> {
         // Find the first sync byte, so we can search easier by doing simple `PACKET_SIZE` buffer
         // reads.
         let mut read_buf = [0];
         let sync_alignment: u64;
 
         loop {
-            let count = match buf_reader.read(&mut read_buf) {
+            let count = match reader.read(&mut read_buf) {
                 Ok(count) => count,
                 Err(e) => return Err(TSError::ReaderError(e))
             };
@@ -58,7 +58,7 @@ impl<R> TSReader<R> where R: Read + Seek{
             }
 
             // Note the location of this SYNC byte for later
-            let sync_pos = buf_reader.stream_position().expect("Couldn't get stream position from BufReader");
+            let sync_pos = reader.stream_position().expect("Couldn't get stream position from BufReader");
 
             #[cfg(feature = "log")]
             trace!("SYNC found at position {} for reader", sync_pos);
@@ -71,11 +71,11 @@ impl<R> TSReader<R> where R: Read + Seek{
             // There is always the possibility that we hit a `0x47` in the payload, seek 1
             // `PACKET_SIZE` further, and find another `0x47` but I don't have a way of accounting
             // for that, so we're going with blind hope that this case doesn't get seen.
-            match buf_reader.seek_relative(PACKET_SIZE as i64 - 1) {
+            match reader.seek(SeekFrom::Current(PACKET_SIZE as i64 - 1)) {
                 Ok(_) => (),
                 Err(e) => return Err(TSError::ReaderError(e))
             };
-            let count = match buf_reader.read(&mut read_buf){
+            let count = match reader.read(&mut read_buf){
                 Ok(count) => count,
                 Err(e) => return Err(TSError::ReaderError(e))
             };
@@ -92,7 +92,7 @@ impl<R> TSReader<R> where R: Read + Seek{
             }
 
             // Seek back to the original location for later reading.
-            match buf_reader.seek(SeekFrom::Start(sync_pos - 1)) {
+            match reader.seek(SeekFrom::Start(sync_pos - 1)) {
                 Ok(_) => (),
                 Err(e) => return Err(TSError::ReaderError(e))
             };
@@ -102,7 +102,7 @@ impl<R> TSReader<R> where R: Read + Seek{
         }
 
         Ok(TSReader {
-            buf_reader,
+            buf_reader: reader,
             sync_alignment,
             packets_read: 0,
             tracked_pids: Vec::new(),
@@ -267,7 +267,7 @@ impl<R> TSReader<R> where R: Read + Seek{
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
+    use std::io::{BufReader, Cursor};
 
     use super::*;
     use test_case::test_case;

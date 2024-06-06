@@ -5,7 +5,6 @@ use crate::AdaptationFieldControl::{AdaptationAndPayload, AdaptationField, Paylo
 use crate::TransportScramblingControl::{EvenKey, NoScrambling, OddKey};
 use crate::TSError::{self, InvalidFirstByte};
 use crate::{AdaptationFieldControl, TransportScramblingControl};
-use std::error::Error;
 use std::fmt::{Display, Formatter};
 use bitvec::field::BitField;
 use bitvec::order::Msb0;
@@ -216,27 +215,16 @@ mod tests {
     use super::*;
     use test_case::test_case;
 
-    #[test]
-    fn from_bytes() {
-        let buf: Box<[u8]> = Box::new([0x47, 0x01, 0x00, 0x1A]);
+    #[test_case([0x47, 0x01, 0x00, 0x1A], false, false, false, 256, AdaptationFieldControl::Payload, 10; "Header 1")]
+    #[test_case([0x47, 0xE1, 0x03, 0x3B], true, true, true, 259, AdaptationFieldControl::AdaptationAndPayload, 11; "Header 2")]
+    fn from_bytes(bytes: [u8; 4], tei: bool, pusi: bool, transport_priority: bool, pid: u16, adaptation_field_control: AdaptationFieldControl, continuity_counter: u8) {
+        let buf: Box<[u8]> = Box::new(bytes);
         let header = TSHeader::from_bytes(&buf).unwrap();
-        assert_eq!(header.tei(), false, "Transport Error Indicator is incorrect");
-        assert_eq!(header.pusi(), false, "Payload Unit Start Indicator is incorrect");
-        assert_eq!(header.transport_priority(), false, "Transport Priority is incorrect");
-        assert_eq!(header.pid(), 256, "Transport Priority is incorrect");
-        assert_eq!(header.adaptation_field_control(), Payload, "Transport Priority is incorrect");
-        assert_eq!(header.continuity_counter(), 10, "Transport Priority is incorrect");
-    }
-
-    #[test]
-    fn from_bytes2() {
-        let buf: Box<[u8]> = Box::new([0x47, 0xE1, 0x00, 0x3B]);
-        let header = TSHeader::from_bytes(&buf).unwrap();
-        assert_eq!(header.tei(), true, "Transport Error Indicator is incorrect");
-        assert_eq!(header.pusi(), true, "Payload Unit Start Indicator is incorrect");
-        assert_eq!(header.transport_priority(), true, "Transport Priority is incorrect");
-        assert_eq!(header.pid(), 256, "Transport Priority is incorrect");
-        assert_eq!(header.adaptation_field_control(), AdaptationAndPayload, "Transport Priority is incorrect");
-        assert_eq!(header.continuity_counter(), 11, "Transport Priority is incorrect");
+        assert_eq!(header.tei(), tei, "Transport Error Indicator is incorrect");
+        assert_eq!(header.pusi(), pusi, "Payload Unit Start Indicator is incorrect");
+        assert_eq!(header.transport_priority(), transport_priority, "Transport Priority is incorrect");
+        assert_eq!(header.pid(), pid, "Transport Priority is incorrect");
+        assert_eq!(header.adaptation_field_control(), adaptation_field_control, "Transport Priority is incorrect");
+        assert_eq!(header.continuity_counter(), continuity_counter, "Transport Priority is incorrect");
     }
 }
