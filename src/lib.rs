@@ -1,14 +1,21 @@
 #![forbid(unsafe_code)]
-// Use these checks when closer to complete. They're a bit too strict for early development.
 #![deny(future_incompatible, missing_docs, rust_2018_idioms, unused, warnings)]
 
-//! This crate is used to read the payload data from a given transport stream.
-
+//! This crate is used to read the payload data from a given transport stream. It is not intended
+//! for multiplexing, demultiplexing, or streaming video. It has only been made for the purpose of
+//! inspecting the transport stream packet header data and payload data.
+//! 
+//! # Sources
+//! 
+//! Almost all of the information related to parsing the packets was found on wikipedia, my lord and
+//! savior. This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular.
+//! 
+//! Please donate to wikipedia if you have the means.
 // Include the README in the doc-tests.
-#[doc = include_str!("../README.md")]
+#![doc = include_str!("../README.md")]
 
-pub mod reader;
 pub mod packet;
+pub mod reader;
 
 mod helpers {
     pub mod tracked_payload;

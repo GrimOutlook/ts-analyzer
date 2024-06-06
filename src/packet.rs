@@ -17,9 +17,7 @@ pub(crate) const PACKET_SIZE: usize = 188;
 /// The length of a transport stream packet is 4 bytes in size.
 pub const HEADER_SIZE: u8 = 4;
 
-/// All of this information is shamelessly stolen from wikipedia, my lord and savior.
-/// This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular. Please donate
-/// to wikipedia if you have the means.
+/// Holds all the information regarding a given packet from the transport stream.
 pub struct TSPacket {
     /// Header object which tracks header attributes of the packet
     header: TSHeader,
@@ -33,6 +31,20 @@ pub struct TSPacket {
 
 impl TSPacket {
     /// Create a TSPacket from a byte array.
+    /// 
+    /// # Parameters
+    /// 
+    /// - `buf`: The buffer to parse the adaptation field from.
+    /// 
+    /// # Returns
+    /// 
+    /// - `Ok(TSPacket)`: If the packet could be successfully parsed from the bytes.
+    /// - `Err(TSError)`: For any of the below errors.
+    /// 
+    /// # Errors
+    /// 
+    /// - If the [header](TSHeader) cannot be parsed for some reason
+    /// - If the [payload pointer](TSPayload::start_index)
     pub fn from_bytes(buf: &mut [u8]) -> Result<TSPacket, TSError> {
         let buffer_length = buf.len();
         let header_bytes = Box::from(buf[0..HEADER_SIZE as usize].to_vec());
@@ -92,6 +104,8 @@ impl TSPacket {
                 BitVec::<u8, Msb0>::from_slice(&buf[read_idx..buf.len()]).as_raw_slice()
             );
 
+            // Check to see if the payload pointer is invalid. We check here to see if the pointer
+            // points past the end of the packet buffer.
             let remainder = (PACKET_SIZE - read_idx) as u8;
             if header.pusi() && payload_bytes[0] > remainder {
                 return Err(TSError::InvalidPayloadPointer(payload_bytes[0], remainder))
@@ -112,7 +126,7 @@ impl TSPacket {
         Ok(packet)
     }
 
-    /// Returns the header object of this packet
+    /// Returns the [header](TSHeader) object of this packet
     pub fn header(&self) -> TSHeader {
         self.header.clone()
     }

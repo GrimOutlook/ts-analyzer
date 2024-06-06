@@ -17,8 +17,6 @@ fn main() {
     // TODO: This actually does nothing to the running speed. This points to unoptimized
     // code.
     let c = Cursor::new(f);
-    // Reader must be mutable due to internal state changing to keep track of what packet is to be
-    // read next and what payloads are being tracked.
     let mut reader = TSReader::new( c).expect("Transport Stream file contains no SYNC bytes.");
     let search = TwoWaySearcher::new(KLV_HEADER);
 

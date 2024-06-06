@@ -82,8 +82,6 @@ impl TrackedPayload {
             self.payloads.remove(start_partial_payload);
         }
 
-
-
         // TODO: Investigate changing this `.into_vec()` call to something else. This is the only
         // way I could get it to work and it's likely that this has performance impacts.
         let payload_data: Box<[u8]> = data_vec.iter().flat_map(|s| s.clone().into_vec()).collect();

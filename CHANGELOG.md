@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - TSReader to support generic inputs that implement the `Read` and `Seek` traits.
+- Updated the `docs.rs` documentation comments to be more thorough.
+
 
 ## [0.1.0] - 2024-06-02
 

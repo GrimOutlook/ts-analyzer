@@ -4,10 +4,13 @@
 [![docs.rs](https://img.shields.io/docsrs/ts-analyzer)](https://docs.rs/ts-analyzer)
 [![Crates.io Version](https://img.shields.io/crates/v/ts-analyzer)](https://crates.io/crates/ts-analyzer/versions)
 [![GitHub Repo stars](https://img.shields.io/github/stars/GrimOutlook/ts-analyzer)](https://github.com/GrimOutlook/ts-analyzer)
-[![Crates.io License](https://img.shields.io/crates/l/ts-analyzer)](LICENSE)
+[![Crates.io License](https://img.shields.io/crates/l/ts-analyzer)](../LICENSE)
 
 
-A library used for analyzing MPEG/Transport Stream files. This library is not intended for encoding, decoding or multiplexing transport streams. It has mainly been created for KLV extraction using [klv-reader](https://github.com/GrimOutlook/klv-reader).
+A library used for analyzing MPEG/Transport Stream files. This library is not intended for encoding,
+decoding or multiplexing transport streams. It has mainly been created for payload extraction and
+packet analysis of transport stream packets. Specifically in the case of KLV extraction using
+[klv-reader](https://github.com/GrimOutlook/klv-reader).
 
 ## Example
 
@@ -22,21 +25,27 @@ use std::io::BufReader;
 fn main() {
     env_logger::init();
     let filename = env::var("TEST_FILE").expect("Environment variable not set");
-    println!("Reading data from {}", filename);
 
+    // We need to open the file first before we can create a TSReader with it. TSReader accepts
+    // anything that implements `Read + Seek` traits so `Cursor` and `BufReader` are other common
+    // classes that can be used. 
     let f = File::open(filename.clone()).expect("Couldn't open file");
-    let buf_reader = BufReader::new(f);
     // Reader must be mutable due to internal state changing to keep track of what packet is to be
-    // read next.
-    let mut reader = TSReader::new(buf_reader).expect("Transport Stream file contains no SYNC bytes.");
+    // read next. `.new()` returns a result because if a SYNC bytes (`0x047`) cannot be found in
+    // the stream or SYNC bytes are not found in a repeating pattern 188 bytes apart then this is
+    // not a valid transport stream.
+    let mut reader = TSReader::new(f).expect("Transport Stream file contains no SYNC bytes.");
 
     let mut packet;
     loop {
-        println!("Reading packet");
-        // Run through packets until we get to one with a payload.
-        packet = reader.next_packet_unchecked() // Read the first TS packet from the file.
-                       .expect("No valid TSPacket found"); // Assume that a TSPacket was found in the file.
+        // Get a packet from the reader. The `unchecked` in the method name means that if an error
+        // is hit then `Some(packet)` is returned rather than `Ok(Some(packet))` in order to reduce
+        // `.unwrap()` (or other) calls.
+        packet = reader.next_packet_unchecked()
+                       // Assume that a TSPacket was found in the file and was successfully parsed.
+                       .expect("No valid TSPacket found");
 
+        // Return once we have found a packet that has a payload.
         if packet.has_payload()  {
             break
         }
@@ -46,6 +55,7 @@ fn main() {
     // payload which can be split among many packets. If that is what is desired look into using
     // the `.next_payload()` and `.next_payload_unchecked()` methods instead.
     let payload = packet.payload();
+    // We have to unwrap the `payload()` call since some packets may not have a payload.
     println!("Payload bytes: {:02X?}", payload.unwrap().data());
 }
 ```

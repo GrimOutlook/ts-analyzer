@@ -1,5 +1,5 @@
-//! This module keeps track of all the information stored in the header of a
-//! transport stream packet.
+//! Keeps track of all the information stored in the header of a transport stream
+//! packet.
 
 use crate::AdaptationFieldControl::{AdaptationAndPayload, AdaptationField, Payload};
 use crate::TransportScramblingControl::{EvenKey, NoScrambling, OddKey};
@@ -15,9 +15,8 @@ use log::trace;
 /// All transport stream packets start with a SYNC byte.
 pub const SYNC_BYTE: u8 = 0x47;
 
-/// All of this information is shamelessly stolen from wikipedia, my lord and savior.
-/// This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular. Please donate
-/// to wikipedia if you have the means.
+/// Keeps track of all the information stored in the header of a transport stream
+/// packet.
 #[derive(Clone, Copy, Debug)]
 pub struct TSHeader {
     /// TEI: Transport error indicator is true when a packet is set when a demodulator cannot

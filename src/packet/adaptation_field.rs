@@ -1,5 +1,5 @@
-//! This module keep track of all the information stored in the adaptation field of the
-//! transport stream packet header.
+//! Keeps track of all the information stored in the adaptation field of the transport stream packet
+//! header.
 
 use bitvec::{field::BitField, order::Msb0, vec::BitVec};
 
@@ -12,10 +12,12 @@ pub const SPLICE_COUNTDOWN_SIZE: u8 = 1;
 /// The length of the transport private data length field is 1 byte in size.
 pub const TRANSPORT_PRIVATE_DATA_LENGTH_LENGTH: u8 = 1;
 
-/// This is created because an adaptation field can either be full of metadata as expected ***OR***
-/// it can be a single stuffing byte. I don't want operations that work on a real adaptation field
-/// to work on a stuffing adaptation field but I don't want to make the adaptation field `None`
-/// either because the the `adaptation_control_field` still says the adaptation field is present.
+/// This is needed because an adaptation field can either be full of [data](DataAdaptationField) as
+/// expected ***OR*** it can be a [single stuffing byte](StuffingAdaptationField). I don't want
+/// operations that work on a real adaptation field to work on a [`StuffingAdaptationField`] but I
+/// don't want to make the adaptation field [`None`] either because the the
+/// [`crate::packet::header::TSHeader::adaptation_field_control()`] still says the adaptation field
+/// is present.
 
 #[derive(Clone, Debug)]
 pub enum AdaptationField {
@@ -26,9 +28,8 @@ pub enum AdaptationField {
     Stuffing(StuffingAdaptationField)
 }
 
-/// All of this information is shamelessly stolen from wikipedia, my lord and savior.
-/// This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular. Please donate
-/// to wikipedia if you have the means.
+/// An adaptation with actual metadata contained within. This is in contrast to a
+/// [`StuffingAdaptationField`] which does not contain any useful/actionable data.
 #[derive(Clone, Debug)]
 pub struct DataAdaptationField {
     /// Number of bytes that make up the adaptation field.
@@ -79,7 +80,7 @@ pub struct DataAdaptationField {
 }
 
 impl DataAdaptationField {
-    /// Create a new adaptation field.
+    /// Create a new adaptation field by filling out all the fields.
     pub fn new(
         adaptation_field_length: u8,
         discontinuity_indicator: bool,
@@ -115,7 +116,11 @@ impl DataAdaptationField {
         }
     }
 
-    /// Parse the adaptation field from the passed in buffer
+    /// Parse the adaptation field from the passed in buffer.
+    /// 
+    /// # Parameters
+    /// 
+    /// - `buf`: The buffer to parse the adaptation field from.
     pub fn from_bytes(buf: &mut [u8]) -> Self {
         // This is just used to track where we are reading each portion of the field.
         let mut read_idx = 0;

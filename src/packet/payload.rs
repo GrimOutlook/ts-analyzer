@@ -1,24 +1,24 @@
-//! TSPayload keeps track of the payload data.
+//! Keeps track of the payload data present in the [transport stream packet](crate::packet::TSPacket).
 
 use crate::TSError::{self,PUSIsNotSet};
 
 #[derive(Clone, Debug)]
-/// Payload of a transport stream object.
+/// Payload of a [transport stream object](crate::packet::TSPacket).
 pub struct TSPayload {
     /// The raw bytes contained in the payload (excluding the Payload Pointer if one exists)
     data: Box<[u8]>,
     /// Indicates where the new payload starts in the data section.
     ///
-    /// This field will be `None` when the `PUSI` (Payload Unit Start Indicator) flag is `0` in the
-    /// header.
+    /// This field will be [`None`] when the [`PUSI`](crate::packet::header::TSHeader::pusi) (Payload
+    /// Unit Start Indicator) flag is `0` in the header.
     start_index: Option<u8>,
     /// The continuity counter keeps track of the order in which packets get created for a specific
     /// PID.
     /// 
     /// This is a clone of the continuity counter found in the header. I have chosen to duplicate it
     /// here due to the fact that it is useful to have when attempting to stitch payloads together.
-    /// By including it the user does not have to store every `TSPacket` and can instead just store
-    /// `TSPayload` objects.
+    /// By including it the user does not have to store every [`crate::packet::TSPacket`] and can
+    /// instead just store [`TSPayload`] objects.
     /// 
     /// This is stored as a u8 but should actually be a u4 as it is only made up of 4 bits in the
     /// header.
@@ -26,8 +26,15 @@ pub struct TSPayload {
 }
 
 impl TSPayload {
-    /// Parse the payload data and `pusi` from the raw payload bytes.
-    pub fn from_bytes(pusi: bool, continuity_counter: u8, payload_data: Box<[u8]>) -> TSPayload {
+    /// Parse the payload data and payload pointer (if one exists) from the raw payload bytes.
+    /// 
+    /// # Parameters
+    /// - `pusi`: Indicates whether a payload pointer exists. If it does then it is the first byte
+    ///   of the `payload_data` parameter.
+    /// - `continuity_counter`: The continuity counter parsed from the header of the packet.
+    /// - `payload_data`: The raw payload data from the packet. This includes the payload pointer
+    /// (if one exists)
+    pub(crate) fn from_bytes(pusi: bool, continuity_counter: u8, payload_data: Box<[u8]>) -> TSPayload {
         let (start_index, data) = if pusi {
             (Some(payload_data[0]), Box::from(&payload_data[1..payload_data.len()]))
         } else {
@@ -42,6 +49,23 @@ impl TSPayload {
     }
 
     /// Return a reference to the raw data stored in the payload.
+    /// 
+    /// # Examples
+    /// 
+    /// ```no_run
+    /// use ts_analyzer::reader::TSReader;
+    /// let filename = "test.ts";
+    /// // Reader must always be mutable due to internal state changes
+    /// let mut reader = TSReader::new(std::fs::File::open(filename).expect("Couldn't open file"))
+    ///                     .expect("File is invalid. Likely not a transport stream file.");
+    /// let packet = reader.next_packet()
+    ///                    .expect("Could not read next packet.")
+    ///                    .expect("File has been completely read");
+    /// let payload = packet.payload()
+    ///                     .expect("Packet has no payload");
+    /// 
+    /// println!("Payload data is {:02X?}", payload.data());
+    /// ```
     pub fn data(&self) -> &Box<[u8]> {
         &self.data
     }
