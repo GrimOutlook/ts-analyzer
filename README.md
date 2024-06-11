@@ -10,10 +10,10 @@
 A library used for analyzing MPEG/Transport Stream files. This library is not intended for encoding, decoding or multiplexing transport streams. It has mainly been created for KLV extraction using [klv-reader](https://github.com/GrimOutlook/klv-reader).
 
 ```rust
-extern crate ts_reader;
+extern crate ts_analyzer;
 
 use std::env;
-use ts_reader::reader::TSReader;
+use ts_analyzer::reader::TSReader;
 use std::fs::File;
 use std::io::BufReader;
 
