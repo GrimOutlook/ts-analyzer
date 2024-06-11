@@ -83,14 +83,14 @@ fn main() {
                         .expect("No valid TSPayload found"); // Assume that a TSPayload was found in the file.
 
         
-        println!("Payload bytes: {:02X?}", payload.data());
+        println!("Payload bytes: {:02X?}", payload);
 
-        if search.search_in(payload.data()).is_some() {
+        if search.search_in(&payload).is_some() {
             break
         }
     }
 
-    println!("Payload bytes: {:02X?}", payload.data());
+    println!("Payload bytes: {:02X?}", payload);
 }
 ```
 

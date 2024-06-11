@@ -1,12 +1,21 @@
 //! This module keeps track of all the information stored in the header of a
 //! transport stream packet.
 
+use crate::errors::invalid_first_byte::InvalidFirstByte;
 use crate::AdaptationFieldControl::{AdaptationAndPayload, AdaptationField, Payload};
 use crate::TransportScramblingControl::{EvenKey, NoScrambling, OddKey};
 use crate::{AdaptationFieldControl, TransportScramblingControl};
+use std::error::Error;
 use std::fmt::{Display, Formatter};
+use bitvec::macros::internal::funty::Fundamental;
+use bitvec::field::BitField;
+use bitvec::order::Msb0;
+use bitvec::vec::BitVec;
 #[cfg(feature = "log")]
 use log::trace;
+
+/// All transport stream packets start with a SYNC byte.
+pub const SYNC_BYTE: u8 = 0x47;
 
 /// All of this information is shamelessly stolen from wikipedia, my lord and savior.
 /// This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular. Please donate
@@ -86,6 +95,56 @@ impl TSHeader {
         }
     }
 
+    /// Get the packet header from raw bytes.
+    pub fn from_bytes(buf: &Box<[u8]>) -> Result<TSHeader, Box<dyn Error>> {
+        let bytes: BitVec<u8, Msb0> = BitVec::from_slice(buf).to_bitvec();
+
+        // Check if the first byte is SYNC byte.
+        if bytes[0..8].load::<u8>() != SYNC_BYTE {
+            return Err(Box::new(InvalidFirstByte { byte: buf[0] }));
+        }
+
+        println!("header bytes: {:b}", bytes);
+        println!("tei: {:b}", bytes[9] as u8);
+        
+        
+        // Get the header information from the header bytes
+        let tei = bytes[9];
+        let pusi = bytes[10];
+        let transport_priority = bytes[11];
+        let pid = bytes[12..24].to_bitvec().load();
+        let transport_scrambling_control = bytes[24..26].to_bitvec().load();
+        let adaptation_field_control = bytes[26..28].to_bitvec().load();
+        let continuity_counter = bytes[28..32].load();
+
+        let header = TSHeader {
+            tei,
+            pusi,
+            transport_priority,
+            pid,
+            tsc: match transport_scrambling_control {
+                0 => NoScrambling,
+                1 => TransportScramblingControl::Reserved,
+                2 => EvenKey,
+                3 => OddKey,
+                _ => panic!("Invalid TSC value [{}]", transport_scrambling_control),
+            },
+            adaptation_field_control: match adaptation_field_control {
+                0 => AdaptationFieldControl::Reserved,
+                1 => Payload,
+                2 => AdaptationField,
+                3 => AdaptationAndPayload,
+                _ => panic!(
+                    "Invalid adaptation field control value [{}]",
+                    adaptation_field_control
+                ),
+            },
+            continuity_counter,
+        };
+        
+        Ok(header)
+    }
+
     /// Return if the transport error indicator is set.
     pub fn tei(&self) -> bool {
         self.tei
@@ -116,10 +175,28 @@ impl TSHeader {
         self.adaptation_field_control
     }
 
+    /// Return whether this packet has an adaptation field or not
+    pub fn has_adaptation_field(&self) -> bool {
+        match self.adaptation_field_control {
+            AdaptationField | AdaptationAndPayload => true,
+            _ => false
+        }
+    }
+
+    /// Return whether this packet has a payload or not
+    pub fn has_payload(&self) -> bool {
+        match self.adaptation_field_control {
+            Payload | AdaptationAndPayload => true,
+            _ => false
+        }
+    }
+
     /// Returns the continuity counter.
     pub fn continuity_counter(&self) -> u8 {
         self.continuity_counter
     }
+
+    
 }
 
 impl Display for TSHeader {
@@ -141,5 +218,22 @@ impl Display for TSHeader {
             self.continuity_counter,
         );
         write!(f, "{}", msg)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    #[test]
+    fn from_bytes() {
+        let buf: Box<[u8]> = Box::new([0x47, 0x01, 0x00, 0x1A]);
+        let header = TSHeader::from_bytes(&buf).unwrap();
+        assert_eq!(header.tei(), false, "Transport Error Indicator is incorrect");
+        assert_eq!(header.pusi(), false, "Payload Unit Start Indicator is incorrect");
+        assert_eq!(header.transport_priority(), false, "Transport Priority is incorrect");
+        assert_eq!(header.pid(), 256, "Transport Priority is incorrect");
+        assert_eq!(header.adaptation_field_control(), Payload, "Transport Priority is incorrect");
     }
 }

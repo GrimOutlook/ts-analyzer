@@ -81,6 +81,12 @@ impl TrackedPayload {
             data_vec.push(self.payloads[idx].get_current_data());
         }
 
+        // Remove all of the payloads that have just been read, except the last one. The last one
+        // will have data that pertains to the next payload.
+        for _ in start_partial_payload..end_partial_payload {
+            self.payloads.remove(start_partial_payload);
+        }
+
         // TODO: Investigate changing this `.into_vec()` call to something else. This is the only
         // way I could get it to work and it's likely that this has performance impacts.
         return Some(data_vec.iter().flat_map(|s| s.clone().into_vec()).collect())
@@ -122,6 +128,9 @@ mod tests {
 
         tp.add(&payload1);
         tp.add(&payload2);
+
+        assert!(tp.get_completed().is_none(), "Payload is completed when it shouldn't be");
+
         tp.add(&payload3);
 
         let completed_payload = tp.get_completed();
@@ -130,5 +139,8 @@ mod tests {
 
         let data = completed_payload.unwrap();
         assert!(data.iter().eq(expected_data.iter()), "Completed packet data is incorrect: {:?}", data);
+
+        // Verify that only the last packet's payload remains in the tracked payload vector.
+        assert_eq!(tp.payloads.len(), 1, "Returned payloads are still being tracked");
     }
 }
