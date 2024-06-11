@@ -76,12 +76,13 @@ fn main() {
 
     let mut payload;
     loop {
+        println!("Reading packet");
         // Run through packets until we get to one with a payload.
         payload = reader.next_payload_unchecked() // Read the first TSPayload from the file.
                         .expect("No valid TSPayload found"); // Assume that a TSPayload was found in the file.
 
         
-    println!("Payload bytes: {:02X?}", payload.data());
+        println!("Payload bytes: {:02X?}", payload.data());
 
         if search.search_in(payload.data()).is_some() {
             break
@@ -98,12 +99,12 @@ fn main() {
 
 - [ ] Parse transport stream packets
     - [x] Parse transport stream packet header
-    - [x] Parse transport straeam packet adaptation field
+    - [x] Parse transport stream packet adaptation field
     - [ ] Parse transport stream packet adaptation extension field
     - [x] Be able to dump raw payload bytes from packet
 - [ ] Parse complete payloads from multiple packets
     - [ ] Track packets based on PID
-    - [ ] Concatonate payloads of the same PID based on continuity counter
+    - [ ] Concatenate payloads of the same PID based on continuity counter
 
 ---
 

@@ -1,5 +1,5 @@
-//! This module keep track of all of the information stored in the adaptation field
-//! of the transport stream packet header.
+//! This module keep track of all the information stored in the adaptation field of the
+//! transport stream packet header.
 
 /// All of this information is shamelessly stolen from wikipedia, my lord and savior.
 /// This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular. Please donate
@@ -8,7 +8,7 @@
 pub struct TSAdaptationField {
     /// Number of bytes that make up the adaptation field.
     /// 
-    /// This includes all of the dynamic data such as the PCR fields as well as the transport
+    /// This includes all the dynamic data such as the PCR fields as well as the transport
     /// private data.
     adaptation_field_length: u8,
     /// Set if current TS packet is in a discontinuity state with respect to either the continuity

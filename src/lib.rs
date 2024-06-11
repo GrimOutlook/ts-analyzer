@@ -5,7 +5,7 @@
 
 //! This crate is used to read the payload data from a given transport stream.
 
-// Include the README in the doctests.
+// Include the README in the doc-tests.
 #[doc = include_str!("../README.md")]
 
 pub mod reader;
@@ -15,6 +15,7 @@ pub mod packet;
 mod errors {
     pub mod invalid_first_byte;
     pub mod no_sync_byte_found;
+    pub mod no_payload_error;
 }
 
 mod helpers {
