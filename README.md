@@ -1,6 +1,6 @@
 # ts-analyzer
 
-A library used for reading MPEG/Transport Stream files. Mainly created for KLV extraction using [klv-reader](https://github.com/GrimOutlook/klv-reader).
+A library used for analyzing MPEG/Transport Stream files. This library is not intended for encoding, decoding or multiplexing transport streams. It has mainly been created for KLV extraction using [klv-reader](https://github.com/GrimOutlook/klv-reader).
 
 ```rust
 extern crate ts_reader;
