@@ -36,3 +36,4 @@ fn main() {
 A sample TS stream with KLV data can be found [here](https://www.arcgis.com/home/item.html?id=55ec6f32d5e342fcbfba376ca2cc409a).
 
 - [Wikipedia: MPEG Transport Stream](https://en.wikipedia.org/wiki/MPEG_transport_stream)
+- [MPEG Official Documentation](https://www.itu.int/rec/dologin_pub.asp?lang=e&id=T-REC-H.222.0-201703-S!!PDF-E&type=items)
