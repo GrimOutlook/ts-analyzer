@@ -4,11 +4,9 @@
 #[derive(Clone, Debug)]
 pub struct TSAdaptationField {
     /// Number of bytes that make up the adaptation field.
-    ///
-    /// TODO: Determine what this length includes. The documentation isn't super clear but seems to
-    /// imply that it includes everything in the adaptation field.
-    /// Not entirely sure if this includes the dynamic data that has its own length field such as
-    /// `Transport Private Data` or `Adaptation Field Extension`.
+    /// 
+    /// This includes all of the dynamic data such as the PCR fields as well as the transport
+    /// private data.
     adaptation_field_length: u8,
     /// Set if current TS packet is in a discontinuity state with respect to either the continuity
     /// counter or the program clock reference
