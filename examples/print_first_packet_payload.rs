@@ -14,11 +14,17 @@ fn main() {
     // Reader must be mutable due to internal state changing to keep track of what packet is to be
     // read next.
     let mut reader = TSReader::new(buf_reader).unwrap();
-    // Get the first packet's payload data.
-    let payload_data = reader.read_next_packet() // Read the first TS packet from the file.
+
+    let mut packet;
+    loop {
+        // Run through packets until we get to one with a payload.
+        packet = reader.read_next_packet() // Read the first TS packet from the file.
                              .expect("Error reading file") // Assume there was no error reading the file.
-                             .expect("No valid TSPacket found") // Assume that a TSPacket was found in the file.
-                             .payload() // Get the payload of the TSPacket.
-                             .expect("No payload data in packet"); // Assume that there was payload data in the TSPacket.
-    println!("Payload bytes: {:#?}", payload_data);
+                             .expect("No valid TSPacket found"); // Assume that a TSPacket was found in the file.
+
+        if packet.has_payload()  { // Check if this packet has a payload.
+            break
+        }
+    }
+    println!("Payload bytes: {:#?}", packet.payload().expect("No payload in this packet").data());
 }
