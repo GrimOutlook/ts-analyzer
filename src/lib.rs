@@ -9,11 +9,16 @@
 #[doc = include_str!("../README.md")]
 
 pub mod reader;
+
 pub mod packet;
 
 mod errors {
     pub mod invalid_first_byte;
     pub mod no_sync_byte_found;
+}
+
+mod helpers {
+    pub mod tracked_payload;
 }
 
 #[derive(Clone, Copy, Debug)]

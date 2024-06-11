@@ -11,7 +11,7 @@ A library used for analyzing MPEG/Transport Stream files. This library is not in
 
 ## Examples
 
-### Reading the payload from the first packet with a payload.
+### Get the payload from the first packet with a payload.
 
 ```rust
 extern crate ts_analyzer;
@@ -35,18 +35,57 @@ fn main() {
     let mut packet;
     loop {
         // Run through packets until we get to one with a payload.
-        packet = reader.read_next_packet_unchecked() // Read the first TS packet from the file.
-                        .expect("No valid TSPacket found"); // Assume that a TSPacket was found in the file.
+        packet = reader.next_packet_unchecked() // Read the first TS packet from the file.
+                       .expect("No valid TSPacket found"); // Assume that a TSPacket was found in the file.
 
-        if packet.has_payload()  { // Check if this packet has a payload.
+        if packet.has_payload()  {
             break
         }
     }
-    assert!(packet.payload().is_some(), "No payload in packet");
+
+    let payload = packet.payload();
+    assert!(payload.is_some(), "No payload in packet");
+    println!("Payload bytes: {:02X?}", payload.unwrap().data());
 }
 ```
 
-### 
+### Get the first full payload with KLV data
+
+```rust
+extern crate ts_analyzer;
+
+use std::env;
+use ts_analyzer::reader::TSReader;
+use std::fs::File;
+use std::io::BufReader;
+
+const KLV_HEADER: &[u8; 16] = b"\x06\x0E\x2B\x34\x02\x0B\x01\x01\x0E\x01\x03\x01\x01\x00\x00\x00";
+
+fn main() {
+    env_logger::init();
+    let filename = env::var("TEST_FILE").expect("Environment variable not set");
+    println!("Reading data from {}", filename);
+
+    let f = File::open(filename).expect("Couldn't open file");
+    let buf_reader = BufReader::new(f);
+    // Reader must be mutable due to internal state changing to keep track of what packet is to be
+    // read next and what payloads are being tracked.
+    let mut reader = TSReader::new(buf_reader).expect("Transport Stream file contains no SYNC bytes.");
+
+    let mut payload;
+    loop {
+        // Run through packets until we get to one with a payload.
+        payload = reader.next_payload_unchecked() // Read the first TSPayload from the file.
+                        .expect("No valid TSPayload found"); // Assume that a TSPayload was found in the file.
+
+        if matches!(payload.data(), KLV_HEADER) {
+            break
+        }
+    }
+
+    println!("Payload bytes: {:02X?}", payload.data());
+}
+```
 
 ---
 
