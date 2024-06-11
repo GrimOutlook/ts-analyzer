@@ -3,6 +3,9 @@ use crate::errors::no_payload::NoPayload;
 use crate::packet::payload::{self, TSPayload};
 use crate::packet::TSPacket;
 
+#[cfg(feature = "log")]
+use log::debug;
+
 pub(crate) struct TrackedPayload {
     /// PID of the packet that these payloads belong to.
     pid: u16,
@@ -86,6 +89,10 @@ impl TrackedPayload {
         for _ in start_partial_payload..end_partial_payload {
             self.payloads.remove(start_partial_payload);
         }
+
+
+        #[cfg(feature = "log")]
+        debug!("Payload is complete");
 
         // TODO: Investigate changing this `.into_vec()` call to something else. This is the only
         // way I could get it to work and it's likely that this has performance impacts.

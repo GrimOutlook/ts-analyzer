@@ -17,6 +17,7 @@ mod errors {
     pub mod no_sync_byte_found;
     pub mod no_payload;
     pub mod payload_is_not_start;
+    pub mod invalid_payload_pointer;
 }
 
 mod helpers {

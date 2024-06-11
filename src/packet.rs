@@ -4,16 +4,18 @@ pub mod header;
 pub mod adaptation_field;
 
 use crate::errors::invalid_first_byte::InvalidFirstByte;
+use crate::errors::invalid_payload_pointer::InvalidPayloadPointer;
 use crate::packet::adaptation_field::TSAdaptationField;
 use crate::packet::header::TSHeader;
 use crate::AdaptationFieldControl::{AdaptationAndPayload, AdaptationField, Payload};
-use bitvec::macros::internal::funty::Fundamental;
 use bitvec::prelude::*;
 use std::error::Error;
 
 use crate::packet::payload::TSPayload;
 #[cfg(feature = "log")]
 use log::trace;
+
+pub(crate) const PACKET_SIZE: usize = 188;
 
 /// The PCR field and OPCR field are 6 bytes in size.
 pub const PCR_SIZE: u8 = 6;
@@ -88,6 +90,12 @@ impl TSPacket {
             let payload_bytes: Box<[u8]> = Box::from(
                 BitVec::<u8, Msb0>::from_slice(&buf[read_idx..buf.len()]).as_raw_slice()
             );
+
+            let remainder = (PACKET_SIZE - read_idx) as u8;
+            if header.pusi() && payload_bytes[0] > remainder {
+                return Err(Box::new(InvalidPayloadPointer { pointer: payload_bytes[0], remainder }))
+            }
+
             Some(TSPayload::from_bytes(header.pusi(), header.continuity_counter(), payload_bytes))
         } else {
             None
@@ -192,16 +200,15 @@ impl TSPacket {
         *read_idx += 1;
 
         // Create a little lambda function to reduce code duplication
-        let read_bool = |bits: &BitVec<u8, Msb0>, index: usize| bits.get(index).unwrap().as_bool();
 
-        let discontinuity_indicator = read_bool(&adaptation_field_required, 0);
-        let random_access_indicator = read_bool(&adaptation_field_required, 1);
-        let elementary_stream_priority_indicator = read_bool(&adaptation_field_required, 2);
-        let pcr_flag = read_bool(&adaptation_field_required, 3);
-        let opcr_flag = read_bool(&adaptation_field_required, 4);
-        let splicing_point_flag = read_bool(&adaptation_field_required, 5);
-        let transport_private_data_flag = read_bool(&adaptation_field_required, 6);
-        let adaptation_field_extension_flag = read_bool(&adaptation_field_required, 7);
+        let discontinuity_indicator = adaptation_field_required[0];
+        let random_access_indicator = adaptation_field_required[1];
+        let elementary_stream_priority_indicator = adaptation_field_required[2];
+        let pcr_flag = adaptation_field_required[3];
+        let opcr_flag = adaptation_field_required[4];
+        let splicing_point_flag = adaptation_field_required[5];
+        let transport_private_data_flag = adaptation_field_required[6];
+        let adaptation_field_extension_flag = adaptation_field_required[7];
 
         let pcr_data = Self::read_pcr_data(&pcr_flag, buf, read_idx);
         let opcr_data = Self::read_pcr_data(&opcr_flag, buf, read_idx);
