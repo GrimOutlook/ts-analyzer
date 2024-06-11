@@ -1,6 +1,10 @@
 # ts-analyzer
 
 ![Crates.io Total Downloads](https://img.shields.io/crates/d/ts-analyzer)
+![docs.rs](https://img.shields.io/docsrs/ts-analyzer)
+![Crates.io Version](https://img.shields.io/crates/v/ts-analyzer)
+![GitHub Repo stars](https://img.shields.io/github/stars/GrimOutlook/ts-analyzer)
+![Crates.io License](https://img.shields.io/crates/l/ts-analyzer)
 
 
 A library used for analyzing MPEG/Transport Stream files. This library is not intended for encoding, decoding or multiplexing transport streams. It has mainly been created for KLV extraction using [klv-reader](https://github.com/GrimOutlook/klv-reader).
