@@ -1,6 +1,6 @@
 extern crate ts_analyzer;
 
-use std::env;
+use std::{env, error::Error};
 use ts_analyzer::reader::TSReader;
 use std::fs::File;
 use std::io::BufReader;
@@ -20,30 +20,24 @@ fn main() {
     let mut reader = TSReader::new(&filename, buf_reader).expect("Transport Stream file contains no SYNC bytes.");
     let search = TwoWaySearcher::new(KLV_HEADER);
 
-    let mut data: Box<[u8]> = Box::from([0]);
+    let mut payload;
     loop {
         println!("Reading packet");
         // Run through packets until we get to one with a payload.
-        let packet = match reader.next_packet() {
+        payload = match reader.next_payload() {
             Ok(payload) => payload.expect("No valid complete TS payload found"),
             Err(e) => {
+                if e.is::<std::io::Error>() {
+                    
+                }
                 panic!("An error was hit!: {}", e);
             }
         };
 
-        let Some(payload) = packet.payload() else {
-            continue
-        };
-
-        data = payload.data().clone();
-
-        
-        println!("Payload bytes: {:02X?}", data);
-
-        if search.search_in(&data).is_some() {
+        if search.search_in(&payload).is_some() {
             break
         }
     }
 
-    println!("Payload bytes: {:02X?}", data);
+    println!("Found KLV payload bytes: {:02X?}", payload);
 }

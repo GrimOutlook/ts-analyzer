@@ -10,6 +10,7 @@ use crate::helpers::tracked_payload::{self, TrackedPayload};
 
 #[cfg(feature = "log")]
 use log::{info,debug,trace};
+use memmem::{Searcher, TwoWaySearcher};
 
 /// Struct used for holding information related to reading the transport stream.
 pub struct TSReader {
@@ -159,9 +160,6 @@ impl TSReader {
                 },
             };
 
-            // Add this packet's payload to the tracked payloads, so we can grab it if we want.
-            self.add_tracked_payload(&packet);
-
             // We should only return a packet if it is in the tracked PIDs (or there are no tracked
             // PIDs)
             if ! self.tracked_pids.is_empty() && ! self.tracked_pids.contains(&packet.header().pid()) {
@@ -190,19 +188,20 @@ impl TSReader {
     /// concatenates their payloads together once a payload has been complete.
     pub fn next_payload(&mut self) -> Result<Option<Box<[u8]>>, Box<dyn Error>> {
         loop {
-            match self.next_packet() {
-                Ok(packet) => {
-                    if packet.is_none() {
-                        return Ok(None);
-                    }
-                },
+            let possible_packet = match self.next_packet() {
+                Ok(packet) => packet,
                 Err(e) => return Err(e),
-            }
+            };
+            
+            let Some(packet) = possible_packet else {
+                return Ok(None);
+            };
 
-            if let Some(Some(complete)) = self.tracked_payloads.iter_mut().map(|tp| tp.get_completed()).find(|c| c.is_some()) {
-                #[cfg(feature = "log")]
-                debug!("Full payload: {:02?}", complete);
-                return Ok(Some(complete))
+            // Add this packet's payload to the tracked payload and retrieve the completed payload
+            // if it exists.
+            let payload = self.add_tracked_payload(&packet);
+            if payload.is_some() {
+                return Ok(payload)
             }
         }
     }
@@ -250,7 +249,7 @@ impl TSReader {
         // the next packet so there is no reason to check if the packet is complete when creating a
         // new TrackedPayload.
 
-        let tp = match TrackedPayload::from_packet(packet) {
+        match TrackedPayload::from_packet(packet) {
             Ok(tp) => {
                 self.tracked_payloads.push(tp);
             }
