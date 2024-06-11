@@ -15,7 +15,8 @@ pub mod packet;
 mod errors {
     pub mod invalid_first_byte;
     pub mod no_sync_byte_found;
-    pub mod no_payload_error;
+    pub mod no_payload;
+    pub mod payload_is_not_start;
 }
 
 mod helpers {

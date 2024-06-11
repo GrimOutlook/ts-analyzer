@@ -10,7 +10,6 @@ use crate::AdaptationFieldControl::{AdaptationAndPayload, AdaptationField, Paylo
 use bitvec::macros::internal::funty::Fundamental;
 use bitvec::prelude::*;
 use std::error::Error;
-use std::io::Read;
 
 use crate::packet::payload::TSPayload;
 #[cfg(feature = "log")]
@@ -201,8 +200,8 @@ impl TSPacket {
         // The first 33 bits are the "base" value which gets multiplied by `300`. This is defined in
         // the MPEG/TS standard.
         let base: u64 = pcr_bits[0..34].load();
-        // The next 6 bits are reserved, so we will ignore them
-        // and the last 9 bits are the "extension" which get added to the multiplied base.
+        // The next 6 bits are reserved, so we will ignore them and the last 9 bits are the
+        // "extension" which get added to the multiplied base.
         let extension: u64 = pcr_bits[39..48].load();
 
         return Some(base * 300 + extension);
@@ -211,9 +210,9 @@ impl TSPacket {
     fn parse_adaptation_field(buf: &mut [u8], read_idx: &mut usize) -> TSAdaptationField {
         // Get the length of the adaptation field.
         //
-        // TODO: Determine if this takes into account the `Transport private data length` field
-        // or not. If it doesn't then that field will need to be parsed as well. For the current
-        // moment I'm assuming it takes it into account
+        // TODO: Determine if this takes into account the `Transport private data length` field or
+        // not. If it doesn't then that field will need to be parsed as well. For the current moment
+        // I'm assuming it takes it into account
         let adaptation_field_len: u8 =
             BitVec::<u8, Msb0>::from_slice(&buf[*read_idx..*read_idx + 1]).load();
 

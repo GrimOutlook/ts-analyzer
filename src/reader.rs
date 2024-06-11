@@ -5,7 +5,7 @@ use std::io::{BufReader, Read, Seek, SeekFrom};
 use crate::errors::no_sync_byte_found::NoSyncByteFound;
 use crate::packet::{SYNC_BYTE, TSPacket};
 use crate::packet::payload::TSPayload;
-use crate::helpers::tracked_payload::TrackedPayload;
+use crate::helpers::tracked_payload::{self, TrackedPayload};
 
 #[cfg(feature = "log")]
 use log::{info,debug,trace};
@@ -74,6 +74,7 @@ impl TSReader {
             // SYNC byte and isn't part of a payload then we'll simply assume that it really is a
             // SYNC byte as we have nothing else to go off of.
             if count == 0 {
+                #[cfg(feature = "log")]
                 debug!("Could not find SYNC byte in file {}");
                 return Err(Box::new(NoSyncByteFound));
             }
@@ -191,7 +192,7 @@ impl TSReader {
     }
 
     /// Add payload data from a packet to the tracked payloads list.
-    fn add_tracked_payload(&mut self, packet: &TSPacket) -> Option<Box<u8>> {
+    fn add_tracked_payload(&mut self, packet: &TSPacket) -> Option<Box<[u8]>> {
         let payload = match packet.payload() {
             Some(payload) => payload,
             None => return None
@@ -201,10 +202,16 @@ impl TSReader {
         let pid = packet.header().pid();
         match self.tracked_payloads.iter().position(|tp| tp.pid() == pid) {
             Some(index) => {
-                return Self::append_data_to_tracked_payload(&self.tracked_payloads[index], &payload);
+                let tracked_payload = &mut self.tracked_payloads[index];
+                return tracked_payload.add_and_get_complete(&payload);
             }
             None => ()
         }
+
+        // We cannot possibly know that a payload is complete from the first packet. In order to
+        // know that a payload is fully contained in 1 packet we need to see the `PUSI` flag set in
+        // the next packet so there is no reason to check if the packet is complete when creating a
+        // new TrackedPayload.
 
         let tp = match TrackedPayload::from_packet(packet) {
             Ok(tp) => {
@@ -212,10 +219,7 @@ impl TSReader {
             }
             Err(_) => {}
         };
-    }
 
-    /// Append the payload data to the known tracked payload
-    fn append_data_to_tracked_payload(tracked_payload: &mut TrackedPayload, payload: &TSPayload) {
-        tracked_payload.add_payload(payload)
+        return None;
     }
 }
