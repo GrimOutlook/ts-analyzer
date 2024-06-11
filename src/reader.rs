@@ -1,7 +1,7 @@
 //! A module for reading the transport stream.
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::io::{BufReader, ErrorKind, Read, Seek, SeekFrom};
 use crate::errors::no_sync_byte_found::NoSyncByteFound;
 use crate::packet::{TSPacket, PACKET_SIZE};
 use crate::packet::header::SYNC_BYTE;
@@ -123,20 +123,26 @@ impl TSReader {
     pub fn next_packet(&mut self) -> Result<Option<TSPacket>, Box<dyn Error>> {
         let mut packet_buf = [0; PACKET_SIZE];
         loop {
-            let count = self.buf_reader.read(&mut packet_buf)?;
+            match self.buf_reader.read_exact(&mut packet_buf) {
+                Ok(_) => {},
+                Err(e) => {
+                    if e.kind() == ErrorKind::UnexpectedEof {
+                        #[cfg(feature = "log")]
+                        {
+                            info!("Finished reading file {}", self.filename);
+                        }
+                        return Ok(None);
+                    }
+
+                    return Err(Box::new(e));
+                },
+            }
 
             #[cfg(feature = "log")]
             {
                 if let Ok(position) = self.buf_reader.stream_position() {
                     trace!("Seek position in file {}: {}", self.filename, position)
                 }
-            }
-
-
-            if count < PACKET_SIZE {
-                #[cfg(feature = "log")]
-                info!("Finished reading file {}", self.filename);
-                return Ok(None);
             }
 
             self.packets_read += 1;
@@ -185,7 +191,11 @@ impl TSReader {
     pub fn next_payload(&mut self) -> Result<Option<Box<[u8]>>, Box<dyn Error>> {
         loop {
             match self.next_packet() {
-                Ok(_) =>(),
+                Ok(packet) => {
+                    if packet.is_none() {
+                        return Ok(None);
+                    }
+                },
                 Err(e) => return Err(e),
             }
 
