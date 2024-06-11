@@ -1,4 +1,4 @@
-# ts-reader
+# ts-analyzer
 
 A library used for reading MPEG/Transport Stream files. Mainly created for KLV extraction using [klv-reader](https://github.com/GrimOutlook/klv-reader).
 
