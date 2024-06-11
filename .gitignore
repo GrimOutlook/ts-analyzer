@@ -17,3 +17,7 @@ Cargo.lock
 ~
 *.bkp
 *.swp
+
+# Remove unnecessary folders
+.idea/
+.vscode/
