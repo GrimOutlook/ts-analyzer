@@ -22,9 +22,11 @@ impl TSReader {
     ///
     /// This function also finds the first SYNC byte, so we can determine the alignment of the
     /// transport packets.
+    /// # Parameters
+    /// - `buf_reader`: a buffered reader that contains transport stream data.
     pub fn new(mut buf_reader: BufReader<File>) -> Result<Self, Box<dyn Error>> {
         // Find the first sync byte, so we can search easier by doing simple `PACKET_SIZE` buffer
-        // reads
+        // reads.
         let mut read_buf = [0];
         let sync_alignment: u64;
 
@@ -80,8 +82,20 @@ impl TSReader {
     }
 
     /// Read the next packet from the transport stream file.
+    ///
+    /// This function returns `None` for any `Err` in order to prevent the need for `.unwrap()`
+    /// calls in more concise code.
     /// # Returns
-    /// `Ok(Some(TSPacket))` if a transport stream packet could be parsed from the bytes.
+    /// `Some(TSPacket)` if the next transport stream packet could be parsed from the file.
+    /// `None` if the next transport stream packet could not be parsed from the file for any
+    /// reason. This includes if the entire file has been fully read.
+    pub fn read_next_packet_unchecked(&mut self) -> Option<TSPacket> {
+        self.read_next_packet().unwrap_or_else(|_| None)
+    }
+
+    /// Read the next packet from the transport stream file.
+    /// # Returns
+    /// `Ok(Some(TSPacket))` if the next transport stream packet could be parsed from the file.
     /// `Ok(None)` if there was no issue reading the file and no more TS packets can be read.
     pub fn read_next_packet(&mut self) -> Result<Option<TSPacket>, Box<dyn Error>> {
         let mut packet_buf = [0; PACKET_SIZE];

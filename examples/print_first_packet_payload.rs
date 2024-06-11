@@ -19,8 +19,7 @@ fn main() {
     let mut packet;
     loop {
         // Run through packets until we get to one with a payload.
-        packet = reader.read_next_packet() // Read the first TS packet from the file.
-                             .expect("Error reading file") // Assume there was no error reading the file.
+        packet = reader.read_next_packet_unchecked() // Read the first TS packet from the file.
                              .expect("No valid TSPacket found"); // Assume that a TSPacket was found in the file.
 
         if packet.has_payload()  { // Check if this packet has a payload.
