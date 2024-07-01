@@ -229,19 +229,14 @@ impl TSReader {
 
     /// Add payload data from a packet to the tracked payloads list.
     fn add_tracked_payload(&mut self, packet: &TSPacket) -> Option<Box<[u8]>> {
-        let payload = match packet.payload() {
-            Some(payload) => payload,
-            None => return None
-        };
+        let payload = packet.payload()?;
 
         // Check to see if we already have an TrackedPayload object for this item PID
         let pid = packet.header().pid();
-        match self.tracked_payloads.iter().position(|tp| tp.pid() == pid) {
-            Some(index) => {
-                let tracked_payload = &mut self.tracked_payloads[index];
-                return tracked_payload.add_and_get_complete(&payload);
-            }
-            None => ()
+        
+        if let Some(index) = self.tracked_payloads.iter().position(|tp| tp.pid() == pid) {
+            let tracked_payload = &mut self.tracked_payloads[index];
+            return tracked_payload.add_and_get_complete(&payload);
         }
 
         // We cannot possibly know that a payload is complete from the first packet. In order to

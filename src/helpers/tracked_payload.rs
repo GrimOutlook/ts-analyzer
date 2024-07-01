@@ -77,12 +77,26 @@ impl TrackedPayload {
             return None;
         }
 
+        // This payload is complete.
+        #[cfg(feature = "log")]
+        trace!("Payload is complete. Stitching data together.");
+
         let mut data_vec = vec![];
         
         // Retrieve the data after the start index from the first partial payload.
-        data_vec.push(self.payloads[start_partial_payload].get_start_data().unwrap());
+        let start_data = self.payloads[start_partial_payload].get_start_data().unwrap();
+        #[cfg(feature = "log")]
+        trace!("Stitching data to payload [{:02X?}].", start_data);
+        data_vec.push(start_data);
+
+
         for idx in start_partial_payload+1..=end_partial_payload {
-            data_vec.push(self.payloads[idx].get_current_data());
+            let data = self.payloads[idx].get_current_data();
+
+            #[cfg(feature = "log")]
+            trace!("Stitching data to payload [{:02X?}].", data);
+            
+            data_vec.push(data);
         }
 
         // Remove all of the payloads that have just been read, except the last one. The last one
