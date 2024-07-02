@@ -132,6 +132,9 @@ impl TSHeader {
             },
             continuity_counter: bytes[28..32].load_be(),
         };
+
+        #[cfg(feature = "log")]
+        trace!("Header for TSPacket: {}", header);
         
         Ok(header)
     }
