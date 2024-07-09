@@ -57,9 +57,9 @@ fn main() {
     - [x] Parse transport stream packet adaptation field
     - [ ] Parse transport stream packet adaptation extension field
     - [x] Be able to dump raw payload bytes from packet
-- [ ] Parse complete payloads from multiple packets
-    - [ ] Track packets based on PID
-    - [ ] Concatenate payloads of the same PID based on continuity counter
+- [x] Parse complete payloads from multiple packets
+    - [x] Track packets based on PID
+    - [x] Concatenate payloads of the same PID based on continuity counter
 
 ---
 
