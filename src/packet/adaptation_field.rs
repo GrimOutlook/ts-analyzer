@@ -1,7 +1,12 @@
 //! This module keep track of all the information stored in the adaptation field of the
 //! transport stream packet header.
 
+use std::fmt::{Display, Formatter};
+
 use bitvec::{field::BitField, order::Msb0, vec::BitVec};
+
+#[cfg(feature = "log")]
+use log::trace;
 
 /// The PCR field and OPCR field are 6 bytes in size.
 pub const PCR_SIZE: u8 = 6;
@@ -117,6 +122,9 @@ impl DataAdaptationField {
 
     /// Parse the adaptation field from the passed in buffer
     pub fn from_bytes(buf: &mut [u8]) -> Self {
+        #[cfg(feature = "log")]
+        trace!("adaptation field bytes: {:02X?}", buf);
+
         // This is just used to track where we are reading each portion of the field.
         let mut read_idx = 0;
         
@@ -184,7 +192,12 @@ impl DataAdaptationField {
             }
         };
 
-        DataAdaptationField {
+        // We currently do nothing with the adaptation extension field.
+        // TODO: Add support for adaptation extension field.
+        #[cfg(feature = "log")]
+        trace!("Packet has adaptation extension field {}", adaptation_field_extension_flag);
+
+        let af = DataAdaptationField {
             adaptation_field_length,
             discontinuity_indicator: adaptation_field_required[0],
             random_access_indicator: adaptation_field_required[1],
@@ -199,7 +212,12 @@ impl DataAdaptationField {
             splice_countdown,
             transport_private_data_length,
             transport_private_data,
-        }
+        };
+
+        #[cfg(feature = "log")]
+        trace!("{}", af);
+
+        return af;
     }
 
     fn read_data_conditionally(
@@ -283,5 +301,29 @@ impl StuffingAdaptationField {
     /// It's `1`.
     pub fn adaptation_field_length(&self) -> u8 {
         self.adaptation_field_length
+    }
+}
+
+impl Display for DataAdaptationField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let msg = format!("\n\
+            Discontinuity: {}\n\
+            Random Access: {}\n\
+            Elementary Stream Priority: {}\n\
+            PCR Flag: {}\n\
+            OPCR Flag: {:?}\n\
+            Splicing Point Flag: {}\n\
+            Transport Private Data Flag: {}\n\
+            Adaptation Field Extension Flag: {}",
+            self.discontinuity_indicator,
+            self.random_access_indicator,
+            self.elementary_stream_priority_indicator,
+            self.pcr_flag,
+            self.opcr_flag,
+            self.splicing_point_flag,
+            self.transport_private_data_flag,
+            self.adaptation_field_extension_flag,
+        );
+        write!(f, "{}", msg)
     }
 }
