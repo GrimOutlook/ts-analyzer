@@ -1,6 +1,6 @@
 extern crate ts_analyzer;
 
-use std::{env, error::Error};
+use std::env;
 use ts_analyzer::reader::TSReader;
 use std::fs::File;
 use std::io::BufReader;

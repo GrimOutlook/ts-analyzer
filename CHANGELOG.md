@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New example `list_pids.rs` which lists all of the PIDs found in the given transport stream file.
+
+### Changed
+
+- Removed unnecessary dependencies from `klv_payload.rs` example
+
 ### Fixed
 
 - Unit test for payload reading that resulted in false negatives.
-
 
 ## [0.2.1] - 2024-07-28
 
