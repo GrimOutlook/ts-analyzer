@@ -2,7 +2,6 @@
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
-use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
@@ -16,7 +15,7 @@ use log::trace;
 use memmem::Searcher;
 use memmem::TwoWaySearcher;
 
-use crate::errors::no_sync_byte_found::NoSyncByteFound;
+use crate::ErrorKind;
 use crate::helpers::tracked_payload::TrackedPayload;
 use crate::packet::PACKET_SIZE;
 use crate::packet::TSPacket;
@@ -47,9 +46,7 @@ impl TSReader {
     /// alignment of the transport packets.
     /// # Parameters
     /// - `buf_reader`: a buffered reader that contains transport stream data.
-    pub fn new(
-        mut buf_reader: BufReader<File>,
-    ) -> Result<Self, Box<dyn Error>> {
+    pub fn new(mut buf_reader: BufReader<File>) -> Result<Self, ErrorKind> {
         // Find the first sync byte, so we can search easier by doing simple
         // `PACKET_SIZE` buffer reads.
         let mut read_buf = [0];
@@ -61,7 +58,7 @@ impl TSReader {
             // Return a `NoSyncByteFound` error if no SYNC byte could be found
             // in the reader.
             if count == 0 {
-                return Err(Box::new(NoSyncByteFound));
+                return Err(ErrorKind::NoSyncByteFound);
             }
 
             // Run through this loop until we find a sync byte.
@@ -98,7 +95,7 @@ impl TSReader {
             if count == 0 {
                 #[cfg(feature = "log")]
                 debug!("Could not find SYNC byte in file {}", filename);
-                return Err(Box::new(NoSyncByteFound));
+                return Err(ErrorKind::NoSyncByteFound);
             }
 
             // Seek back to the original location for later reading.
@@ -139,13 +136,13 @@ impl TSReader {
     /// `Ok(Some(TSPacket))` if the next transport stream packet could be parsed
     /// from the file. `Ok(None)` if there was no issue reading the file and
     /// no more TS packets can be read.
-    pub fn next_packet(&mut self) -> Result<Option<TSPacket>, Box<dyn Error>> {
+    pub fn next_packet(&mut self) -> Result<Option<TSPacket>, ErrorKind> {
         let mut packet_buf = [0; PACKET_SIZE];
         loop {
             match self.buf_reader.read_exact(&mut packet_buf) {
                 Ok(_) => {}
                 Err(e) => {
-                    if e.kind() == ErrorKind::UnexpectedEof {
+                    if e.kind() == std::io::ErrorKind::UnexpectedEof {
                         #[cfg(feature = "log")]
                         {
                             info!("Finished reading file {}", self.filename);
@@ -153,7 +150,7 @@ impl TSReader {
                         return Ok(None);
                     }
 
-                    return Err(Box::new(e));
+                    return Err(e.into());
                 }
             }
 
@@ -234,9 +231,7 @@ impl TSReader {
     /// PSI and which are PET. We can then disregard all PET streams instead
     /// of naively treating them as PSI streams and trying to find a KLV
     /// value in it.
-    pub fn next_payload(
-        &mut self,
-    ) -> Result<Option<Box<[u8]>>, Box<dyn Error>> {
+    pub fn next_payload(&mut self) -> Result<Option<Box<[u8]>>, ErrorKind> {
         loop {
             let possible_packet = self.next_packet()?;
 
@@ -304,4 +299,3 @@ impl TSReader {
         None
     }
 }
-

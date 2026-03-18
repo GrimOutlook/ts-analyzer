@@ -12,7 +12,7 @@ use bitvec::prelude::*;
 #[cfg(feature = "log")]
 use log::trace;
 
-use crate::errors::invalid_payload_pointer::InvalidPayloadPointer;
+use crate::ErrorKind;
 use crate::packet::adaptation_field::DataAdaptationField;
 use crate::packet::header::TSHeader;
 use crate::packet::payload::TSPayload;
@@ -38,7 +38,7 @@ pub struct TSPacket {
 
 impl TSPacket {
     /// Create a TSPacket from a byte array.
-    pub fn from_bytes(buf: &mut [u8]) -> Result<TSPacket, Box<dyn Error>> {
+    pub fn from_bytes(buf: &mut [u8]) -> Result<TSPacket, ErrorKind> {
         let buffer_length = buf.len();
         let header_bytes = Box::from(buf[0..HEADER_SIZE as usize].to_vec());
 
@@ -93,10 +93,10 @@ impl TSPacket {
 
             let remainder = (PACKET_SIZE - read_idx) as u8;
             if header.pusi() && payload_bytes[0] > remainder {
-                return Err(Box::new(InvalidPayloadPointer {
+                return Err(ErrorKind::InvalidPayloadPointer {
                     pointer: payload_bytes[0],
                     remainder,
-                }));
+                });
             }
 
             Some(TSPayload::from_bytes(

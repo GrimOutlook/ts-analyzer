@@ -5,7 +5,7 @@ use log::trace;
 use memmem::Searcher;
 use memmem::TwoWaySearcher;
 
-use crate::errors::no_payload::NoPayload;
+use crate::ErrorKind;
 use crate::packet::TSPacket;
 use crate::packet::payload::TSPayload;
 
@@ -28,10 +28,10 @@ impl TrackedPayload {
     ///
     /// This initializes the object with only the payload data of the packet
     /// that was passed in.
-    pub fn from_packet(packet: &TSPacket) -> Result<Self, Box<dyn Error>> {
+    pub fn from_packet(packet: &TSPacket) -> Result<Self, ErrorKind> {
         let payload = match packet.payload() {
             Some(payload) => payload,
-            None => return Err(Box::new(NoPayload)),
+            None => return Err(ErrorKind::NoPayload),
         };
 
         Ok(TrackedPayload {
@@ -228,4 +228,3 @@ mod tests {
         );
     }
 }
-

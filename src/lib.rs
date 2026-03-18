@@ -15,16 +15,44 @@ pub mod reader;
 
 pub mod packet;
 
-mod errors {
-    pub mod invalid_first_byte;
-    pub mod invalid_payload_pointer;
-    pub mod no_payload;
-    pub mod no_sync_byte_found;
-    pub mod payload_is_not_start;
-}
-
 mod helpers {
     pub mod tracked_payload;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ErrorKind {
+    /// Error that is thrown when trying to parse a byte array as a transport
+    /// stream packet, but it doesn't start with a `SYNC_BYTE`.
+    #[error("Invalid first byte for transport stream packet `{byte}`")]
+    InvalidFirstByte {
+        /// Invalid first byte.
+        byte: u8,
+    },
+
+    /// Error that is thrown when the payload pointer is larger than possible
+    /// could possibly fit in the remainder of the packet.
+    #[error(
+        "Invalid payload pointer `{pointer}` for payload with `{remainder}` bytes remaining"
+    )]
+    InvalidPayloadPointer { pointer: u8, remainder: u8 },
+
+    /// Error that is thrown when trying read a payload from a packet without a
+    /// payload.
+    #[error("Cannot read payload from packet that has none")]
+    NoPayload,
+
+    /// Error that is thrown when trying to read a transport stream file and no
+    /// SYNC byte can be found.
+    #[error("Stream contains no SYNC byte")]
+    NoSyncByteFound,
+
+    /// Error that is thrown when trying to read the start of a new payload and
+    /// no new payload is present in a packet.
+    #[error("Continuation payload cannot be used as a starting payload")]
+    PayloadIsNotStart,
+
+    #[error(transparent)]
+    Unknown(#[from] std::io::Error),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -58,4 +86,3 @@ impl Display for Errors {
         }
     }
 }
-

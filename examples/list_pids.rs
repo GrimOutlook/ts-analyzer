@@ -11,10 +11,6 @@ use ts_analyzer::reader::TSReader;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Setup the verbose flag
-    #[command(flatten)]
-    verbose: clap_verbosity_flag::Verbosity,
-
     /// Get what video to scan
     #[arg(short, long)]
     path: String,
@@ -24,11 +20,6 @@ fn main() -> ExitCode {
     // Parse the arguments
     let args = Args::parse();
     let video = &args.path;
-
-    // Initialize the logger
-    env_logger::Builder::new()
-        .filter_level(args.verbose.log_level_filter())
-        .init();
 
     info!("Starting laser video sorter");
 
@@ -64,4 +55,3 @@ fn main() -> ExitCode {
 
     ExitCode::from(0)
 }
-

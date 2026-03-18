@@ -15,11 +15,11 @@ use crate::AdaptationFieldControl;
 use crate::AdaptationFieldControl::AdaptationAndPayload;
 use crate::AdaptationFieldControl::AdaptationField;
 use crate::AdaptationFieldControl::Payload;
+use crate::ErrorKind;
 use crate::TransportScramblingControl;
 use crate::TransportScramblingControl::EvenKey;
 use crate::TransportScramblingControl::NoScrambling;
 use crate::TransportScramblingControl::OddKey;
-use crate::errors::invalid_first_byte::InvalidFirstByte;
 
 /// All transport stream packets start with a SYNC byte.
 pub const SYNC_BYTE: u8 = 0x47;
@@ -107,12 +107,12 @@ impl TSHeader {
     }
 
     /// Get the packet header from raw bytes.
-    pub fn from_bytes(buf: &[u8]) -> Result<TSHeader, Box<dyn Error>> {
+    pub fn from_bytes(buf: &[u8]) -> Result<TSHeader, ErrorKind> {
         let bytes: BitVec<u8, Msb0> = BitVec::from_slice(buf).to_bitvec();
 
         // Check if the first byte is SYNC byte.
         if bytes[0..8].load::<u8>() != SYNC_BYTE {
-            return Err(Box::new(InvalidFirstByte { byte: buf[0] }));
+            return Err(ErrorKind::InvalidFirstByte { byte: buf[0] });
         }
 
         #[cfg(feature = "log")]
@@ -272,4 +272,3 @@ mod tests {
         );
     }
 }
-
