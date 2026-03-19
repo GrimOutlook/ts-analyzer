@@ -1,34 +1,31 @@
 //! A module for reading the transport stream.
-use std::error::Error;
-use std::fs::File;
-use std::io::BufReader;
 use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
 
-#[cfg(feature = "log")]
-use log::debug;
-#[cfg(feature = "log")]
-use log::info;
-#[cfg(feature = "log")]
-use log::trace;
-use memmem::Searcher;
-use memmem::TwoWaySearcher;
+#[cfg(feature = "tracing")]
+use tracing::debug;
+#[cfg(any(feature = "tracing", feature = "read_amount_mb"))]
+use tracing::info;
+#[cfg(feature = "tracing")]
+use tracing::trace;
 
 use crate::ErrorKind;
 use crate::helpers::tracked_payload::TrackedPayload;
 use crate::packet::PACKET_SIZE;
-use crate::packet::TSPacket;
+use crate::packet::TsPacket;
 use crate::packet::header::SYNC_BYTE;
 
 /// Struct used for holding information related to reading the transport stream.
-pub struct TSReader {
+#[derive(Debug, getset::Getters)]
+pub struct TsReader<T> {
     /// Buffered reader for the transport stream file.
-    buf_reader: BufReader<File>,
+    reader: T,
     /// Sync byte alignment. A Sync byte should be found every `PACKET_SIZE`
     /// away.
     sync_alignment: u64,
     /// Counter of the number of packets read
+    #[get = "pub"]
     packets_read: u64,
     /// PIDs that should be tracked when querying for packets or payloads.
     ///
@@ -37,16 +34,36 @@ pub struct TSReader {
     tracked_pids: Vec<u16>,
     /// Payloads that are currently being tracked by the reader.
     tracked_payloads: Vec<TrackedPayload>,
+
+    /// Number of bytes last reported to have been read
+    last_reported_read_amount: u64,
 }
 
-impl TSReader {
+impl<T> TsReader<T>
+where
+    T: Read + Seek,
+{
+    pub fn iter_packets(&'_ mut self) -> TsPackets<'_, T> {
+        TsPackets(self)
+    }
+
+    pub fn iter_payloads(&'_ mut self) -> TsPayloads<'_, T> {
+        TsPayloads(self)
+    }
+
+    pub fn stream_position(&mut self) -> u64 {
+        self.reader.stream_position().unwrap()
+    }
+
     /// Create a new TSReader instance using the given file.
     ///
     /// This function also finds the first SYNC byte, so we can determine the
     /// alignment of the transport packets.
     /// # Parameters
     /// - `buf_reader`: a buffered reader that contains transport stream data.
-    pub fn new(mut buf_reader: BufReader<File>) -> Result<Self, ErrorKind> {
+    pub fn new(mut buf_reader: T) -> Result<Self, ErrorKind> {
+        #[cfg(feature = "tracing")]
+        trace!("Attempting to create new TS packet");
         // Find the first sync byte, so we can search easier by doing simple
         // `PACKET_SIZE` buffer reads.
         let mut read_buf = [0];
@@ -71,8 +88,8 @@ impl TSReader {
                 .stream_position()
                 .expect("Couldn't get stream position from BufReader");
 
-            #[cfg(feature = "log")]
-            trace!("SYNC found at position {} for file {}", sync_pos, filename);
+            #[cfg(feature = "tracing")]
+            trace!("SYNC found at position {}", sync_pos);
 
             // If we think this is the correct alignment because we have found a
             // SYNC byte we need to verify that this is correct by
@@ -93,8 +110,8 @@ impl TSReader {
             // payload then we'll simply assume that it really is a
             // SYNC byte as we have nothing else to go off of.
             if count == 0 {
-                #[cfg(feature = "log")]
-                debug!("Could not find SYNC byte in file {}", filename);
+                #[cfg(feature = "tracing")]
+                debug!("Could not find SYNC byte in stream");
                 return Err(ErrorKind::NoSyncByteFound);
             }
 
@@ -109,12 +126,13 @@ impl TSReader {
             }
         }
 
-        Ok(TSReader {
-            buf_reader,
+        Ok(TsReader {
+            reader: buf_reader,
             sync_alignment,
             packets_read: 0,
             tracked_pids: Vec::new(),
             tracked_payloads: Vec::new(),
+            last_reported_read_amount: 0,
         })
     }
 
@@ -127,7 +145,7 @@ impl TSReader {
     /// from the file. `None` if the next transport stream packet could not
     /// be parsed from the file for any reason. This includes if the entire
     /// file has been fully read.
-    pub fn next_packet_unchecked(&mut self) -> Option<TSPacket> {
+    pub fn next_packet_unchecked(&mut self) -> Option<TsPacket> {
         self.next_packet().unwrap_or(None)
     }
 
@@ -136,48 +154,45 @@ impl TSReader {
     /// `Ok(Some(TSPacket))` if the next transport stream packet could be parsed
     /// from the file. `Ok(None)` if there was no issue reading the file and
     /// no more TS packets can be read.
-    pub fn next_packet(&mut self) -> Result<Option<TSPacket>, ErrorKind> {
+    pub fn next_packet(&mut self) -> Result<Option<TsPacket>, ErrorKind> {
         let mut packet_buf = [0; PACKET_SIZE];
         loop {
-            match self.buf_reader.read_exact(&mut packet_buf) {
-                Ok(_) => {}
-                Err(e) => {
-                    if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                        #[cfg(feature = "log")]
-                        {
-                            info!("Finished reading file {}", self.filename);
-                        }
-                        return Ok(None);
-                    }
-
-                    return Err(e.into());
+            if let Err(e) = self.reader.read_exact(&mut packet_buf) {
+                if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                    #[cfg(feature = "tracing")]
+                    info!("Finished reading file");
+                    return Ok(None);
                 }
+
+                return Err(e.into());
             }
 
-            #[cfg(feature = "log")]
+            if (cfg!(feature = "tracing") || cfg!(feature = "read_amount_mb"))
+                && let Ok(position) = self.reader.stream_position()
             {
-                if let Ok(position) = self.buf_reader.stream_position() {
-                    trace!(
-                        "Seek position in file {}: {}",
-                        self.filename, position
-                    )
+                #[cfg(feature = "tracing")]
+                trace!("Seek position in stream: {}", position);
+
+                if cfg!(feature = "read_amount_mb") {
+                    let amount = position / (1000 * 1000);
+                    if self.last_reported_read_amount < amount {
+                        info!("Read {}MB from stream", amount);
+                        self.last_reported_read_amount = amount;
+                    }
                 }
             }
 
             self.packets_read += 1;
-            #[cfg(feature = "log")]
-            trace!(
-                "Packets read in file {}: {}",
-                self.filename, self.packets_read
-            );
+            #[cfg(feature = "tracing")]
+            trace!("Packets read from input: {}", self.packets_read);
 
-            let packet = match TSPacket::from_bytes(&mut packet_buf) {
+            let packet = match TsPacket::from_bytes(&mut packet_buf) {
                 Ok(packet) => packet,
                 Err(e) => {
-                    #[cfg(feature = "log")]
+                    #[cfg(feature = "tracing")]
                     debug!(
-                        "Got error from {} when trying to parse next packet from bytes {:2X?}",
-                        self.filename, packet_buf
+                        "Got error when trying to parse next packet from bytes {:2X?}",
+                        packet_buf
                     );
                     return Err(e);
                 }
@@ -191,6 +206,8 @@ impl TSReader {
                 continue;
             }
 
+            #[cfg(feature = "tracing")]
+            debug!("Returning TS packet for PID: {}", packet.header().pid());
             return Ok(Some(packet));
         }
     }
@@ -204,7 +221,7 @@ impl TSReader {
     /// from the file. `None` if the next transport stream payload could not
     /// be parsed from the file for any reason. This includes if the entire
     /// file has been fully read.
-    pub fn next_payload_unchecked(&mut self) -> Option<Box<[u8]>> {
+    pub fn next_payload_unchecked(&mut self) -> Option<Vec<u8>> {
         self.next_payload().unwrap_or(None)
     }
 
@@ -231,7 +248,9 @@ impl TSReader {
     /// PSI and which are PET. We can then disregard all PET streams instead
     /// of naively treating them as PSI streams and trying to find a KLV
     /// value in it.
-    pub fn next_payload(&mut self) -> Result<Option<Box<[u8]>>, ErrorKind> {
+    pub fn next_payload(&mut self) -> Result<Option<Vec<u8>>, ErrorKind> {
+        #[cfg(feature = "tracing")]
+        trace!("Getting next payload");
         loop {
             let possible_packet = self.next_packet()?;
 
@@ -272,18 +291,17 @@ impl TSReader {
     }
 
     /// Add payload data from a packet to the tracked payloads list.
-    fn add_tracked_payload(&mut self, packet: &TSPacket) -> Option<Box<[u8]>> {
+    fn add_tracked_payload(&mut self, packet: &TsPacket) -> Option<Vec<u8>> {
         let payload = packet.payload()?;
 
         // Check to see if we already have an TrackedPayload object for this
         // item PID
         let pid = packet.header().pid();
 
-        if let Some(index) =
-            self.tracked_payloads.iter().position(|tp| tp.pid() == pid)
+        if let Some(ref mut tracked_payload) =
+            self.tracked_payloads.iter_mut().find(|tp| tp.pid() == pid)
         {
-            let tracked_payload = &mut self.tracked_payloads[index];
-            return tracked_payload.add_and_get_complete(&payload);
+            return tracked_payload.add(payload);
         }
 
         // We cannot possibly know that a payload is complete from the first
@@ -297,5 +315,30 @@ impl TSReader {
         };
 
         None
+    }
+}
+
+pub struct TsPackets<'a, T>(&'a mut TsReader<T>);
+impl<'a, T> Iterator for TsPackets<'a, T>
+where
+    T: Read + Seek,
+{
+    type Item = Result<TsPacket, ErrorKind>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next_packet().transpose()
+    }
+}
+
+#[derive(derive_more::Deref)]
+pub struct TsPayloads<'a, T>(&'a mut TsReader<T>);
+impl<'a, T> Iterator for TsPayloads<'a, T>
+where
+    T: Read + Seek,
+{
+    type Item = Result<Vec<u8>, ErrorKind>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next_payload().transpose()
     }
 }

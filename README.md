@@ -15,7 +15,7 @@ A library used for analyzing MPEG/Transport Stream files. This library is not in
 extern crate ts_analyzer;
 
 use std::env;
-use ts_analyzer::reader::TSReader;
+use ts_analyzer::reader::TsReader;
 use std::fs::File;
 use std::io::BufReader;
 
@@ -27,7 +27,7 @@ fn main() {
     let f = File::open(filename.clone()).expect("Couldn't open file");
     // Reader must be mutable due to internal state changing to keep track of what packet is to be
     // read next.
-    let mut reader = TSReader::new(BufReader::new(f)).expect("Transport Stream file contains no SYNC bytes.");
+    let mut reader = TsReader::new(BufReader::new(f)).expect("Transport Stream file contains no SYNC bytes.");
 
     let mut packet;
     loop {

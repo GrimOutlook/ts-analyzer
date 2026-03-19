@@ -6,7 +6,7 @@ use std::io::BufReader;
 
 use memmem::Searcher;
 use memmem::TwoWaySearcher;
-use ts_analyzer::reader::TSReader;
+use ts_analyzer::reader::TsReader;
 
 const KLV_HEADER: &[u8; 16] =
     b"\x06\x0E\x2B\x34\x02\x0B\x01\x01\x0E\x01\x03\x01\x01\x00\x00\x00";
@@ -20,7 +20,7 @@ fn main() {
     let buf_reader = BufReader::new(f);
     // Reader must be mutable due to internal state changing to keep track of
     // what packet is to be read next and what payloads are being tracked.
-    let mut reader = TSReader::new(buf_reader)
+    let mut reader = TsReader::new(buf_reader)
         .expect("Transport Stream file contains no SYNC bytes.");
     let search = TwoWaySearcher::new(KLV_HEADER);
 
@@ -31,7 +31,6 @@ fn main() {
         payload = match reader.next_payload() {
             Ok(payload) => payload.expect("No valid complete TS payload found"),
             Err(e) => {
-                if e.is::<std::io::Error>() {}
                 panic!("An error was hit!: {}", e);
             }
         };
@@ -43,4 +42,3 @@ fn main() {
 
     println!("Found KLV payload bytes: {:02X?}", payload);
 }
-

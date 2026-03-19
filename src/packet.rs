@@ -4,18 +4,15 @@ pub mod adaptation_field;
 pub mod header;
 pub mod payload;
 
-use std::error::Error;
-
 use adaptation_field::AdaptationField;
 use adaptation_field::StuffingAdaptationField;
-use bitvec::prelude::*;
-#[cfg(feature = "log")]
-use log::trace;
+#[cfg(feature = "tracing")]
+use tracing::trace;
 
 use crate::ErrorKind;
 use crate::packet::adaptation_field::DataAdaptationField;
-use crate::packet::header::TSHeader;
-use crate::packet::payload::TSPayload;
+use crate::packet::header::TsHeader;
+use crate::packet::payload::TsPayload;
 
 pub(crate) const PACKET_SIZE: usize = 188;
 
@@ -25,27 +22,27 @@ pub const HEADER_SIZE: u8 = 4;
 /// All of this information is shamelessly stolen from wikipedia, my lord and
 /// savior. This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular. Please donate
 /// to wikipedia if you have the means.
-pub struct TSPacket {
+pub struct TsPacket {
     /// Header object which tracks header attributes of the packet
-    header: TSHeader,
+    header: TsHeader,
     /// Adaptation field data. This field will be `None` when the adaptation
     /// field control field has a `0` in the MSB place.
     adaptation_field: Option<AdaptationField>,
     /// Payload field data. This field will be `None` when the adaptation field
     /// control field has a `0` in the LSB place.
-    payload: Option<TSPayload>,
+    payload: Option<TsPayload>,
 }
 
-impl TSPacket {
+impl TsPacket {
     /// Create a TSPacket from a byte array.
-    pub fn from_bytes(buf: &mut [u8]) -> Result<TSPacket, ErrorKind> {
+    pub fn from_bytes(buf: &mut [u8]) -> Result<TsPacket, ErrorKind> {
         let buffer_length = buf.len();
         let header_bytes = Box::from(buf[0..HEADER_SIZE as usize].to_vec());
 
-        #[cfg(feature = "log")]
+        #[cfg(feature = "tracing")]
         trace!("Parsing TSPacket from raw bytes: {:02X?}", buf);
 
-        let header = TSHeader::from_bytes(&header_bytes)?;
+        let header = TsHeader::from_bytes(&header_bytes)?;
 
         // This number comes from the fact that the TS header is always 4 bytes
         // wide and the adaptation field always comes directly after the
@@ -55,7 +52,7 @@ impl TSPacket {
         // If the adaptation field is present we need to determine it's size as
         // we want to ignore it entirely.
         let adaptation_field = if header.has_adaptation_field() {
-            #[cfg(feature = "log")]
+            #[cfg(feature = "tracing")]
             trace!("Adaptation field exists for TSPacket");
 
             // Get the length of the adaptation field. If it's `0` then this is
@@ -83,13 +80,10 @@ impl TSPacket {
         };
 
         let payload = if header.has_payload() {
-            #[cfg(feature = "log")]
+            #[cfg(feature = "tracing")]
             trace!("Payload exists for TSPacket");
 
-            let payload_bytes: Box<[u8]> = Box::from(
-                BitVec::<u8, Msb0>::from_slice(&buf[read_idx..buf.len()])
-                    .as_raw_slice(),
-            );
+            let payload_bytes = &buf[read_idx..buf.len()];
 
             let remainder = (PACKET_SIZE - read_idx) as u8;
             if header.pusi() && payload_bytes[0] > remainder {
@@ -99,7 +93,7 @@ impl TSPacket {
                 });
             }
 
-            Some(TSPayload::from_bytes(
+            Some(TsPayload::from_bytes(
                 header.pusi(),
                 header.continuity_counter(),
                 payload_bytes,
@@ -109,13 +103,13 @@ impl TSPacket {
         };
 
         // Payload data should now start at the read_idx.
-        let packet = TSPacket { header, adaptation_field, payload };
+        let packet = TsPacket { header, adaptation_field, payload };
 
         Ok(packet)
     }
 
     /// Returns the header object of this packet
-    pub fn header(&self) -> TSHeader {
+    pub fn header(&self) -> TsHeader {
         self.header
     }
 
@@ -135,7 +129,7 @@ impl TSPacket {
     }
 
     /// Return the payload data
-    pub fn payload(&self) -> Option<TSPayload> {
+    pub fn payload(&self) -> Option<TsPayload> {
         self.payload.clone()
     }
 }
@@ -215,7 +209,7 @@ mod tests {
         packet: fn() -> (Box<[u8]>, AdaptationFieldControl, Box<[u8]>),
     ) {
         let (mut buf, adaptation_field_control, first_packet_bytes) = packet();
-        let packet = TSPacket::from_bytes(&mut buf).unwrap();
+        let packet = TsPacket::from_bytes(&mut buf).unwrap();
 
         assert_eq!(
             packet.header().adaptation_field_control(),
@@ -223,13 +217,13 @@ mod tests {
             "Transport Error Indicator is incorrect"
         );
 
-        let real_first_bytes: Box<[u8]> = packet.payload().unwrap().data()
-            [0..first_packet_bytes.len()]
-            .into();
-        assert!(
-            real_first_bytes.iter().eq(first_packet_bytes.iter()),
-            "First payload bytes are incorrect: {:02X?}",
-            real_first_bytes
-        );
+        match packet.payload().unwrap().get_payload_data() {
+            payload::TsPayloadData::StartData(start, _end) => assert!(
+                start.iter().eq(first_packet_bytes.iter()),
+                "First payload bytes are incorrect: {:02X?}",
+                start
+            ),
+            _ => panic!(),
+        };
     }
 }

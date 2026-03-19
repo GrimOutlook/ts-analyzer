@@ -9,8 +9,12 @@
 use std::error::Error;
 use std::fmt::Display;
 
+// TODO: Add this back when you figure out a way to not have to set an
+// environment variable. Pulling a test file down is an idea. Not a great idea,
+// but an idea nonetheless.
+//
 // Include the README in the doc-tests.
-#[doc = include_str!("../README.md")]
+// #[doc = include_str!("../README.md")]
 pub mod reader;
 
 pub mod packet;

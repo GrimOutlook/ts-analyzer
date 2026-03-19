@@ -7,8 +7,8 @@ use std::fmt::Formatter;
 use bitvec::field::BitField;
 use bitvec::order::Msb0;
 use bitvec::vec::BitVec;
-#[cfg(feature = "log")]
-use log::trace;
+#[cfg(feature = "tracing")]
+use tracing::trace;
 
 /// The PCR field and OPCR field are 6 bytes in size.
 pub const PCR_SIZE: u8 = 6;
@@ -128,7 +128,7 @@ impl DataAdaptationField {
 
     /// Parse the adaptation field from the passed in buffer
     pub fn from_bytes(buf: &mut [u8]) -> Self {
-        #[cfg(feature = "log")]
+        #[cfg(feature = "tracing")]
         trace!("adaptation field bytes: {:02X?}", buf);
 
         // This is just used to track where we are reading each portion of the
@@ -203,7 +203,7 @@ impl DataAdaptationField {
 
         // We currently do nothing with the adaptation extension field.
         // TODO: Add support for adaptation extension field.
-        #[cfg(feature = "log")]
+        #[cfg(feature = "tracing")]
         trace!(
             "Packet has adaptation extension field {}",
             adaptation_field_extension_flag
@@ -226,7 +226,7 @@ impl DataAdaptationField {
             transport_private_data,
         };
 
-        #[cfg(feature = "log")]
+        #[cfg(feature = "tracing")]
         trace!("{}", af);
 
         af

@@ -8,8 +8,8 @@ use std::fmt::Formatter;
 use bitvec::field::BitField;
 use bitvec::order::Msb0;
 use bitvec::vec::BitVec;
-#[cfg(feature = "log")]
-use log::trace;
+#[cfg(feature = "tracing")]
+use tracing::trace;
 
 use crate::AdaptationFieldControl;
 use crate::AdaptationFieldControl::AdaptationAndPayload;
@@ -28,7 +28,7 @@ pub const SYNC_BYTE: u8 = 0x47;
 /// savior. This [article](https://en.wikipedia.org/wiki/MPEG_transport_stream) in particular. Please donate
 /// to wikipedia if you have the means.
 #[derive(Clone, Copy, Debug)]
-pub struct TSHeader {
+pub struct TsHeader {
     /// TEI: Transport error indicator is true when a packet is set when a
     /// demodulator cannot correct invalid_first_byte and indicates that
     /// the packet is corrupt.
@@ -62,7 +62,7 @@ pub struct TSHeader {
     continuity_counter: u8,
 }
 
-impl TSHeader {
+impl TsHeader {
     /// Create a new header
     pub fn new(
         tei: bool,
@@ -73,14 +73,14 @@ impl TSHeader {
         adaptation_field_control: u8,
         continuity_counter: u8,
     ) -> Self {
-        #[cfg(feature = "log")]
+        #[cfg(feature = "tracing")]
         {
             trace!("pid: [{}]", pid);
             trace!("adaptation_field_control: [{}]", adaptation_field_control);
             trace!("continuity_counter: [{}]", continuity_counter);
         }
 
-        TSHeader {
+        TsHeader {
             tei,
             pusi,
             transport_priority,
@@ -107,7 +107,7 @@ impl TSHeader {
     }
 
     /// Get the packet header from raw bytes.
-    pub fn from_bytes(buf: &[u8]) -> Result<TSHeader, ErrorKind> {
+    pub fn from_bytes(buf: &[u8]) -> Result<TsHeader, ErrorKind> {
         let bytes: BitVec<u8, Msb0> = BitVec::from_slice(buf).to_bitvec();
 
         // Check if the first byte is SYNC byte.
@@ -115,11 +115,11 @@ impl TSHeader {
             return Err(ErrorKind::InvalidFirstByte { byte: buf[0] });
         }
 
-        #[cfg(feature = "log")]
+        #[cfg(feature = "tracing")]
         trace!("header bytes: {:b}", bytes);
 
         // Get the header information from the header bytes
-        let header = TSHeader {
+        let header = TsHeader {
             tei: bytes[8],
             pusi: bytes[9],
             transport_priority: bytes[10],
@@ -147,7 +147,7 @@ impl TSHeader {
             continuity_counter: bytes[28..32].load_be(),
         };
 
-        #[cfg(feature = "log")]
+        #[cfg(feature = "tracing")]
         trace!("Header for TSPacket: {}", header);
 
         Ok(header)
@@ -202,7 +202,7 @@ impl TSHeader {
     }
 }
 
-impl Display for TSHeader {
+impl Display for TsHeader {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let msg = format!(
             "\n\
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn from_bytes() {
         let buf: Box<[u8]> = Box::new([0x47, 0x01, 0x00, 0x1A]);
-        let header = TSHeader::from_bytes(&buf).unwrap();
+        let header = TsHeader::from_bytes(&buf).unwrap();
         assert!(!header.tei(), "Transport Error Indicator is incorrect");
         assert!(!header.pusi(), "Payload Unit Start Indicator is incorrect");
         assert!(
@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn from_bytes2() {
         let buf: Box<[u8]> = Box::new([0x47, 0xE1, 0x00, 0x3B]);
-        let header = TSHeader::from_bytes(&buf).unwrap();
+        let header = TsHeader::from_bytes(&buf).unwrap();
         assert!(header.tei(), "Transport Error Indicator is incorrect");
         assert!(header.pusi(), "Payload Unit Start Indicator is incorrect");
         assert!(header.transport_priority(), "Transport Priority is incorrect");

@@ -4,9 +4,9 @@ use std::io::BufReader;
 use std::process::ExitCode;
 
 use clap::Parser;
-use log::debug;
-use log::info;
-use ts_analyzer::reader::TSReader;
+use tracing::debug;
+use tracing::info;
+use ts_analyzer::reader::TsReader;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -29,7 +29,7 @@ fn main() -> ExitCode {
     // Boilerplate to create a TSReader object
     let f = File::open(video).expect("Couldn't open file");
     let buf_reader = BufReader::new(f);
-    let mut reader = TSReader::new(buf_reader)
+    let mut reader = TsReader::new(buf_reader)
         .expect("Transport Stream file contains no SYNC bytes.");
 
     loop {
