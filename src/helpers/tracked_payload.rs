@@ -24,8 +24,9 @@ impl TrackedPayload {
     ///
     /// This initializes the object with only the payload data of the packet
     /// that was passed in.
-    pub fn from_packet(packet: &TsPacket) -> Result<Self, ErrorKind> {
-        let Some(payload) = packet.payload() else {
+    pub fn from_packet(packet: TsPacket) -> Result<Self, ErrorKind> {
+        let pid = &packet.header().pid();
+        let Some(payload) = packet.to_payload() else {
             return Err(ErrorKind::NoPayload);
         };
 
@@ -34,10 +35,7 @@ impl TrackedPayload {
             return Err(ErrorKind::PayloadIsNotStart);
         };
 
-        Ok(TrackedPayload {
-            pid: packet.header().pid(),
-            current_data: Some(start),
-        })
+        Ok(TrackedPayload { pid: *pid, current_data: Some(start) })
     }
 
     /// Adds raw payload bytes from a TSPayload object

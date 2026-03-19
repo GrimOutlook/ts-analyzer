@@ -1,13 +1,13 @@
 //! This module keeps track of all the information stored in the header of a
 //! transport stream packet.
 
-use std::error::Error;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
 use bitvec::field::BitField;
 use bitvec::order::Msb0;
-use bitvec::vec::BitVec;
+use bitvec::slice::BitSlice;
+use bitvec::view::BitView;
 #[cfg(feature = "tracing")]
 use tracing::trace;
 
@@ -108,7 +108,7 @@ impl TsHeader {
 
     /// Get the packet header from raw bytes.
     pub fn from_bytes(buf: &[u8]) -> Result<TsHeader, ErrorKind> {
-        let bytes: BitVec<u8, Msb0> = BitVec::from_slice(buf).to_bitvec();
+        let bytes: &BitSlice<u8, Msb0> = buf.view_bits();
 
         // Check if the first byte is SYNC byte.
         if bytes[0..8].load::<u8>() != SYNC_BYTE {

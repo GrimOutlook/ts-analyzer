@@ -129,8 +129,13 @@ impl TsPacket {
     }
 
     /// Return the payload data
-    pub fn payload(&self) -> Option<TsPayload> {
-        self.payload.clone()
+    pub fn payload(&self) -> &Option<TsPayload> {
+        &self.payload
+    }
+
+    /// Move payload data
+    pub fn to_payload(self) -> Option<TsPayload> {
+        self.payload
     }
 }
 
@@ -217,7 +222,7 @@ mod tests {
             "Transport Error Indicator is incorrect"
         );
 
-        match packet.payload().unwrap().get_payload_data() {
+        match packet.payload().clone().unwrap().get_payload_data() {
             payload::TsPayloadData::StartData(start, _end) => assert!(
                 start.iter().eq(first_packet_bytes.iter()),
                 "First payload bytes are incorrect: {:02X?}",

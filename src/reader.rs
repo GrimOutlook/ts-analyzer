@@ -260,7 +260,7 @@ where
 
             // Add this packet's payload to the tracked payload and retrieve the
             // completed payload if it exists.
-            let payload = self.add_tracked_payload(&packet);
+            let payload = self.add_tracked_payload(packet);
             if payload.is_some() {
                 return Ok(payload);
             }
@@ -291,16 +291,15 @@ where
     }
 
     /// Add payload data from a packet to the tracked payloads list.
-    fn add_tracked_payload(&mut self, packet: &TsPacket) -> Option<Vec<u8>> {
-        let payload = packet.payload()?;
-
+    fn add_tracked_payload(&mut self, packet: TsPacket) -> Option<Vec<u8>> {
         // Check to see if we already have an TrackedPayload object for this
         // item PID
-        let pid = packet.header().pid();
+        let pid = &packet.header().pid();
 
         if let Some(ref mut tracked_payload) =
-            self.tracked_payloads.iter_mut().find(|tp| tp.pid() == pid)
+            self.tracked_payloads.iter_mut().find(|tp| &tp.pid() == pid)
         {
+            let payload = packet.to_payload()?;
             return tracked_payload.add(payload);
         }
 

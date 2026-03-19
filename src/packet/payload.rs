@@ -64,8 +64,8 @@ impl TsPayload {
 
     /// Returns the current payload data. This is the data before the start
     /// index, if one exists.
-    pub fn get_payload_data(&self) -> TsPayloadData {
-        self.data.clone()
+    pub fn get_payload_data(self) -> TsPayloadData {
+        self.data
     }
 }
 
