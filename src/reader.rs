@@ -176,6 +176,7 @@ where
                 if cfg!(feature = "read_amount_mb") {
                     let amount = position / (1000 * 1000);
                     if self.last_reported_read_amount < amount {
+                        #[cfg(feature = "tracing")]
                         info!("Read {}MB from stream", amount);
                         self.last_reported_read_amount = amount;
                     }
