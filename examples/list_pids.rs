@@ -1,15 +1,16 @@
+use std::collections::HashSet;
+use std::fs::File;
+use std::io::BufReader;
+use std::process::ExitCode;
+
 use clap::Parser;
-use ts_analyzer::reader::TSReader;
-use std::{collections::HashSet, fs::File, io::BufReader, process::ExitCode};
-use log::{debug, info};
+use tracing::debug;
+use tracing::info;
+use ts_analyzer::reader::TsReader;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Setup the verbose flag
-    #[command(flatten)]
-    verbose: clap_verbosity_flag::Verbosity,
-
     /// Get what video to scan
     #[arg(short, long)]
     path: String,
@@ -19,11 +20,6 @@ fn main() -> ExitCode {
     // Parse the arguments
     let args = Args::parse();
     let video = &args.path;
-    
-    // Initialize the logger
-    env_logger::Builder::new()
-        .filter_level(args.verbose.log_level_filter())
-        .init();
 
     info!("Starting laser video sorter");
 
@@ -33,7 +29,8 @@ fn main() -> ExitCode {
     // Boilerplate to create a TSReader object
     let f = File::open(video).expect("Couldn't open file");
     let buf_reader = BufReader::new(f);
-    let mut reader = TSReader::new(video, buf_reader).expect("Transport Stream file contains no SYNC bytes.");
+    let mut reader = TsReader::new(buf_reader)
+        .expect("Transport Stream file contains no SYNC bytes.");
 
     loop {
         // Check to see if any of the KLV data indicates that the laser is on
@@ -56,5 +53,5 @@ fn main() -> ExitCode {
 
     println!("PIDs in video file [{}]:\n{:#?}", video, pids);
 
-    return ExitCode::from(0);
+    ExitCode::from(0)
 }
